@@ -3,7 +3,6 @@ import { Draggable } from "@hello-pangea/dnd";
 import type { MouseEvent } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
 import { rotuloDaRecorrencia } from "@/lib/leads/valor-recorrente";
 import type { Lead } from "@/lib/types/leads";
@@ -270,21 +269,26 @@ export function KanbanCard({
                   atende mouse, teclado e leitor sem desfazer a decisão antiga. */}
               {/* Fork ASK: a foto de perfil do WhatsApp do lead, já guardada pelo
                   cron contact-avatars (nenhuma busca nova ao canal). Só monta a
-                  <img> quando há arquivo; sem foto, a inicial do título. */}
+                  <img> quando há arquivo; sem foto, a inicial do título.
+                  <img> nativa com loading="lazy": o AvatarImage do Radix pré-carrega
+                  a imagem por fora do DOM e ignora o lazy, o que disparava um pedido
+                  de foto por card (centenas por quadro) e travava o funil. */}
               {lead.contact_id && (
-                <Avatar className="mt-0.5 h-7 w-7 shrink-0">
+                <span className="relative mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-elevated text-[11px] font-medium text-text-muted">
+                  {(card.title?.trim()?.[0] ?? "?").toUpperCase()}
                   {lead.contact_has_avatar ? (
-                    <AvatarImage
+                    <img
                       src={`/api/v1/contacts/${lead.contact_id}/avatar`}
                       alt=""
-                      className="object-cover"
                       loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
                     />
                   ) : null}
-                  <AvatarFallback className="bg-surface-elevated text-[11px] font-medium text-text-muted">
-                    {(card.title?.trim()?.[0] ?? "?").toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                </span>
               )}
               <h3
                 // Compacto: UMA linha, com o texto inteiro no `title` (e no
