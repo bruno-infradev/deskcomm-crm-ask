@@ -3,6 +3,7 @@ import { Draggable } from "@hello-pangea/dnd";
 import type { MouseEvent } from "react";
 import { useT } from "@/hooks/i18n/useT";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
 import { rotuloDaRecorrencia } from "@/lib/leads/valor-recorrente";
 import type { Lead } from "@/lib/types/leads";
@@ -267,6 +268,24 @@ export function KanbanCard({
                   acessibilidade; deixar só onKeyDown daria uma ação que existe
                   e NÃO É DESCOBERTA por leitor de tela. O título como button
                   atende mouse, teclado e leitor sem desfazer a decisão antiga. */}
+              {/* Fork ASK: a foto de perfil do WhatsApp do lead, já guardada pelo
+                  cron contact-avatars (nenhuma busca nova ao canal). Só monta a
+                  <img> quando há arquivo; sem foto, a inicial do título. */}
+              {lead.contact_id && (
+                <Avatar className="mt-0.5 h-7 w-7 shrink-0">
+                  {lead.contact_has_avatar ? (
+                    <AvatarImage
+                      src={`/api/v1/contacts/${lead.contact_id}/avatar`}
+                      alt=""
+                      className="object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-surface-elevated text-[11px] font-medium text-text-muted">
+                    {(card.title?.trim()?.[0] ?? "?").toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <h3
                 // Compacto: UMA linha, com o texto inteiro no `title` (e no
                 // dossiê). O dado não some — some a segunda linha.

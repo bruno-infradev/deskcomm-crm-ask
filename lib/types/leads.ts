@@ -146,6 +146,12 @@ export interface Lead {
   contact_email?: string;
   contact_links?: Array<{ tipo: string; href: string }>;
   /**
+   * Fork ASK, derivado: o contato tem foto de perfil guardada (cron
+   * contact-avatars). O card mostra a foto por `/api/v1/contacts/:id/avatar`;
+   * sem ela, a inicial.
+   */
+  contact_has_avatar?: boolean;
+  /**
    * Derivado (não é coluna): os marcadores das CONVERSAS do contato deste
    * negócio — a terceira caixa, "Tags da conversa" no painel do Inbox, onde a
    * IA também escreve. União de TODAS as conversas do contato, não só da mais

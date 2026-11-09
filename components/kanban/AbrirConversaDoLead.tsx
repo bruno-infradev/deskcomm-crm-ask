@@ -1,8 +1,7 @@
 "use client";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useConversaNovaComEscolhaDeCanal } from "@/components/channels/SeletorDeCanalParaConversa";
 
 import { useT } from "@/hooks/i18n/useT";
 import { ArrowRight, ChatCircle } from "@/lib/ui/icons";
@@ -64,15 +63,19 @@ export function AbrirConversaDoLead({ contactId, phone, variante = "card" }: Pro
   const t = useT();
   const router = useRouter();
   const qc = useQueryClient();
-  const [abrindo, setAbrindo] = useState(false);
+  // Fork ASK: o card abre a conversa pelo MESMO fluxo da tabela de contatos
+  // (issue #2382): com mais de um número elegível, o vendedor escolhe por qual
+  // número a conversa nasce; com um só, segue direto. Conversa que já existe
+  // com o contato naquele número é reaberta pela rota (índice único).
+  const { iniciarConversa, abrindo, seletor } = useConversaNovaComEscolhaDeCanal({
+    aoAbrir: async (conversationId) => {
+      await qc.invalidateQueries({ queryKey: ["board"] });
+      router.push(`/app/inbox?id=${conversationId}`);
+    },
+  });
 
   const telefone = phone?.trim() ?? "";
-  // Rede de segurança: quem monta (ConversaSlot, ConversaNoDossie) já checou
-  // com `temAlvoParaAbrir`; aqui o retorno vem DEPOIS dos hooks, para a ordem
-  // deles nunca depender de props.
   const temAlvo = temAlvoParaAbrir(contactId, phone);
-  // Sem telefone nenhum a rota não tem o que abrir — e a spec da #1993 pede
-  // que o clique NÃO vá ao servidor nesse caso, e que o motivo apareça.
   const podeAbrir = telefone.length > 0;
   const semTelefone = t(
     "Sem telefone no contato: cadastre um telefone para abrir a conversa.",
@@ -80,38 +83,22 @@ export function AbrirConversaDoLead({ contactId, phone, variante = "card" }: Pro
 
   if (!temAlvo) return null;
 
-  async function abrir() {
+  function abrir() {
     if (!podeAbrir || abrindo) return;
-    setAbrindo(true);
-    try {
-      const res = await fetch("/api/v1/conversations/open-with-contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact_id: contactId || undefined,
-          phone_number: telefone,
-        }),
-      });
-      const json = (await res.json()) as {
-        data?: { conversation_id: string };
-        error?: { message?: string };
-      };
-      if (!res.ok || !json.data?.conversation_id) {
-        throw new Error(json.error?.message ?? t("Não foi possível abrir a conversa."));
-      }
-      // O quadro é a fonte do card E do dossiê: sem invalidar, a linha continuaria
-      // oferecendo "Abrir conversa" sobre uma conversa que acabou de nascer.
-      await qc.invalidateQueries({ queryKey: ["board"] });
-      router.push(`/app/inbox?id=${json.data.conversation_id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? t(err.message) : t("Não foi possível abrir a conversa."));
-    } finally {
-      setAbrindo(false);
-    }
+    void iniciarConversa({ contact_id: contactId || undefined, phone_number: telefone });
   }
+
+  // O diálogo vive num portal, mas eventos do React sobem pela árvore de
+  // componentes: sem a cerca, clicar no seletor abriria o dossiê do card.
+  const dialogo = seletor ? (
+    <span onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+      {seletor}
+    </span>
+  ) : null;
 
   if (variante === "dossie") {
     return (
+      <>
       <button
         type="button"
         onClick={() => void abrir()}
@@ -126,8 +113,8 @@ export function AbrirConversaDoLead({ contactId, phone, variante = "card" }: Pro
             {abrindo
               ? t("Abrindo…")
               : podeAbrir
-                ? t("Abrir conversa no Inbox")
-                : t("Abrir conversa")}
+                ? t("Iniciar atendimento")
+                : t("Iniciar atendimento")}
           </span>
           {!podeAbrir && (
             <span className="block text-[11px] text-text-muted">{semTelefone}</span>
@@ -142,10 +129,13 @@ export function AbrirConversaDoLead({ contactId, phone, variante = "card" }: Pro
           />
         )}
       </button>
+      {dialogo}
+      </>
     );
   }
 
   return (
+    <>
     <button
       type="button"
       // O card inteiro é arrastável e clicável (abre o dossiê): sem parar a
@@ -168,12 +158,14 @@ export function AbrirConversaDoLead({ contactId, phone, variante = "card" }: Pro
       )}
     >
       <ChatCircle size={12} weight="regular" className="shrink-0" aria-hidden />
-      <span>{abrindo ? t("Abrindo…") : t("Abrir conversa")}</span>
+      <span>{abrindo ? t("Abrindo…") : t("Iniciar atendimento")}</span>
       {!podeAbrir && (
         // O motivo visível: `title` some para quem não tem mouse, e o leitor de
         // tela não anuncia botão desabilitado.
         <span className="ml-auto shrink-0 text-text-muted">{t("sem telefone")}</span>
       )}
     </button>
+    {dialogo}
+    </>
   );
 }
