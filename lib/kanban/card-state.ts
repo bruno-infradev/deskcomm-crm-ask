@@ -22,6 +22,8 @@ export interface CardInput {
   recurringValueCents?: number | null;
   /** Periodicidade da recorrência (`monthly` na v1). */
   recurringPeriod?: string | null;
+  /** Fork ASK (10/11/2026, pedido do Bruno na reunião): `custom_fields.faturamento_mensal` do formulário, visível no card. */
+  faturamentoMensal?: string | null;
   currency: string | null;
   owner: OwnerDisplay;
   /** Nome do estágio atual — o "3d em Negociação" do rodapé. */
@@ -69,6 +71,8 @@ export interface CardInput {
   tags: string[];
 }
 
+const textoDoCampo = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+
 /**
  * Monta o CardInput a partir do que o board tem em mãos. Pura e testável: é
  * aqui que se decide o que o card VÊ, e é o único lugar onde a linha do banco
@@ -84,6 +88,7 @@ export function buildCardInput(
     | "recurring_period"
     | "currency"
     | "tags"
+    | "custom_fields"
     | "stage_changed_at"
     | "created_at"
     | "owner_kind"
@@ -130,6 +135,7 @@ export function buildCardInput(
     // diferentes, e o card só desenha o segundo trecho quando o primeiro não é.
     recurringValueCents: lead.recurring_value_cents ?? null,
     recurringPeriod: lead.recurring_period ?? null,
+    faturamentoMensal: textoDoCampo(lead.custom_fields?.faturamento_mensal),
     currency: lead.currency,
     owner: resolveLeadOwner(lead, opts.ownerNames),
     stageName: opts.stageName,

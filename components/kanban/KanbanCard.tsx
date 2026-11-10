@@ -349,6 +349,20 @@ export function KanbanCard({
             )}
             {!value && !recorrente && "—"}
           </p>
+          {/* Fork ASK: faturamento mensal do formulário e as etiquetas (até 3) visíveis no card, sem abrir o dossiê. */}
+          {(card.faturamentoMensal || card.tags.length > 0) && (
+            <div data-testid="card-etiquetas" className="mt-1 flex flex-wrap items-center gap-1 text-[10px] leading-4">
+              {card.faturamentoMensal && (
+                <span className="truncate rounded bg-muted px-1.5 text-text" title={`${t("Faturamento")}: ${card.faturamentoMensal}`}>
+                  {t("Fat.")} {card.faturamentoMensal}
+                </span>
+              )}
+              {card.tags.slice(0, 3).map((tag) => (
+                <span key={tag} className="truncate rounded border border-border px-1.5 text-text-muted">{tag}</span>
+              ))}
+              {card.tags.length > 3 && <span className="text-text-muted">+{card.tags.length - 3}</span>}
+            </div>
+          )}
 
           {/* ③ a linha do agente — um slot, três estados, nunca três blocos. */}
           <div
