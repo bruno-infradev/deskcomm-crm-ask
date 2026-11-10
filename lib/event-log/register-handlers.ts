@@ -39,6 +39,7 @@ import { avisoDePropostaNoWhatsAppHandler } from "@/lib/propostas/aviso-no-whats
 import { avisoDeAgendamentoNoWhatsAppHandler } from "@/lib/agenda/aviso-de-agendamento.handler";
 import { cobrancaSinalHandler } from "@/lib/cobranca/sinal.handler";
 import { reenvioDesaceleradoHandler } from "@/lib/messaging/reenvio-desacelerado.handler";
+import { primeiraMensagemMoveHandler } from "@/lib/leads/primeira-mensagem-move.handler";
 import { registerHandler } from "@/lib/event-log/dispatcher";
 
 let _registered = false;
@@ -48,6 +49,8 @@ export function ensureHandlersRegistered(): void {
   // Follow-up de inbound ANTES do LLM: no Hobby o drain da mensagem
   // estourava no worker de IA e o match_reply nunca lia a resposta.
   registerHandler(followupReactivityHandler);
+  // Fork ASK (10/11): primeira mensagem ao lead em "Novo" leva o card para "Em andamento". Escrita curta no banco.
+  registerHandler(primeiraMensagemMoveHandler);
   // Atribuição de resposta da campanha: logo depois da reatividade e ANTES do
   // LLM, pelo mesmo motivo dela — é escrita curta no banco, sem rede de
   // terceiro, e não pode ficar atrás de um consumidor que pode estourar.
