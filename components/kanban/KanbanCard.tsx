@@ -275,7 +275,7 @@ export function KanbanCard({
                   de foto por card (centenas por quadro) e travava o funil. */}
               {lead.contact_id && (
                 <span className="relative mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-elevated text-[11px] font-medium text-text-muted">
-                  {(card.title?.trim()?.[0] ?? "?").toUpperCase()}
+                  {(Array.from(card.title?.trim() ?? "")[0] ?? "?").toUpperCase()}
                   {lead.contact_has_avatar ? (
                     <img
                       src={`/api/v1/contacts/${lead.contact_id}/avatar`}

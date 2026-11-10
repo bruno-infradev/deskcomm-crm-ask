@@ -525,6 +525,35 @@ async function withAnexos(
   };
 }
 
+/**
+ * Fork ASK: o PostgREST corta toda consulta em `max-rows` (1.000) sem avisar, e o
+ * quadro lia os leads numa consulta só — o Comercial da ASK (2,9 mil leads) mostrava
+ * "1000" na coluna Novo para o administrador. Lê em páginas de 1.000 até a última
+ * vir menor, com a MESMA ordem estável (position_in_stage, id) do original, e
+ * devolve o mesmo formato `{ data, error }` que o `Promise.all` já esperava.
+ */
+const TAMANHO_PAGINA_QUADRO = 1000;
+async function leadsDoFunilEmPaginas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  pipelineId: string,
+): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
+  const todos: unknown[] = [];
+  for (let de = 0; ; de += TAMANHO_PAGINA_QUADRO) {
+    const { data, error } = await supabase
+      .from("crm_leads")
+      .select("*")
+      .eq("pipeline_id", pipelineId)
+      .neq("status", "archived")
+      .order("position_in_stage")
+      .order("id")
+      .range(de, de + TAMANHO_PAGINA_QUADRO - 1);
+    if (error) return { data: null, error };
+    todos.push(...(data ?? []));
+    if ((data?.length ?? 0) < TAMANHO_PAGINA_QUADRO) break;
+  }
+  return { data: todos, error: null };
+}
+
 export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const requestId = randomUUID();
   const { id: pipelineId } = await ctx.params;
@@ -552,21 +581,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
       .eq("pipeline_id", pipelineId)
       .eq("is_archived", false)
       .order("position"),
-    supabase
-      .from("crm_leads")
-      .select("*")
-      .eq("pipeline_id", pipelineId)
-      .neq("status", "archived")
-      .order("position_in_stage")
-      // O DESEMPATE (#3461): a ordem do quadro tem de ser ESTÁVEL. Sem esta
-      // linha, dois cards com a MESMA `position_in_stage` — o lote antigo que
-      // gravou a mesma posição em N linhas, ou duas entradas que empataram —
-      // saem na ordem que o plano escolher, e essa ordem pode mudar de uma
-      // leitura para outra: os dois cards TROCAM DE LUGAR a cada render, sem
-      // ninguém arrastar nada. `id` é imutável, então a ordem é a mesma em toda
-      // leitura. Mesma regra (e mesmo motivo) do `.order("id")` da lista em
-      // `app/api/v1/pipelines/[id]/leads/route.ts`.
-      .order("id"),
+    leadsDoFunilEmPaginas(supabase, pipelineId),
   ]);
 
   if (pipelineErr) return fail("internal_error", pipelineErr.message, 500, { requestId });
