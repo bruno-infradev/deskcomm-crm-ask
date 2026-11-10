@@ -892,6 +892,15 @@ export const NAV_CATALOG = [
     modulo: "honorarios",
   },
   {
+    href: "/app/abordagem",
+    label: "Abordagem do dia",
+    description: "Pessoas abordadas hoje por vendedor, contra a meta diária.",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+  },
+  {
     href: "/app/metrics",
     label: "Desempenho",
     description: "Funil e performance por atendente nos últimos 30 dias.",
