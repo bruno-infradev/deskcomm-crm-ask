@@ -106,3 +106,18 @@ export function rotuloDoTipoDeCanal(provider: string | null | undefined): string
   if (!provider) return null;
   return ROTULO_DO_TIPO[provider] ?? null;
 }
+
+/**
+ * Fork ASK (10/11/2026): vendedor só inicia conversa pelo PRÓPRIO número (onde é o responsável no roteamento).
+ * Sem número próprio (admin, gestor), a lista segue inteira. Evita a conversa nascer no número do colega,
+ * invisível para quem clicou ("Iniciar atendimento carrega e não abre").
+ */
+export function restringirAosMeusNumeros<T extends { id: string }>(
+  canais: readonly T[] | undefined | null,
+  meusIds: readonly string[] | undefined | null,
+): T[] {
+  const lista = Array.isArray(canais) ? [...canais] : [];
+  if (!meusIds || meusIds.length === 0) return lista;
+  const proprios = lista.filter((c) => meusIds.includes(c.id));
+  return proprios.length > 0 ? proprios : lista;
+}

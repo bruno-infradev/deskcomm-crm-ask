@@ -33,6 +33,7 @@
  * deixar o botão "Iniciar conversa" sem resposta por causa de um problema de
  * leitura que não impede abrir a conversa.
  */
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -51,6 +52,7 @@ import { useT } from "@/hooks/i18n/useT";
 import {
   candidatosParaConversaNova,
   elegiveisParaConversaNova,
+  restringirAosMeusNumeros,
   rotuloDoTipoDeCanal,
 } from "@/lib/channels/conversa-nova";
 import { lerEstadoDoCanal, nomeDoCanal, rotuloDoEstadoDoCanal } from "@/lib/channels/estado";
@@ -212,7 +214,18 @@ export function useConversaNovaComEscolhaDeCanal(opts: {
   const [pendente, setPendente] = useState<AlvoDeConversa | null>(null);
   const [abrindo, setAbrindo] = useState(false);
 
-  const candidatos = candidatosParaConversaNova(canais.data);
+  const meus = useQuery({
+    queryKey: ["channel-sessions", "meus-ids"],
+    queryFn: async () => {
+      const r = await fetch("/api/v1/channel-sessions/meus", { cache: "no-store" });
+      if (!r.ok) return [] as string[];
+      const j = (await r.json()) as { data?: { numeros?: { id: string }[] } };
+      return (j.data?.numeros ?? []).map((n) => n.id);
+    },
+    staleTime: 60_000,
+  });
+  const meusIds = meus.data;
+  const candidatos = restringirAosMeusNumeros(candidatosParaConversaNova(canais.data), meusIds);
 
   /**
    * A lista, garantida na hora de DECIDIR.
@@ -259,7 +272,8 @@ export function useConversaNovaComEscolhaDeCanal(opts: {
     setAbrindo(true);
     try {
       const lista = await listaDeCanais();
-      const elegiveis = elegiveisParaConversaNova(candidatosParaConversaNova(lista));
+      const meusAgora = meusIds ?? (await meus.refetch()).data;
+      const elegiveis = elegiveisParaConversaNova(restringirAosMeusNumeros(candidatosParaConversaNova(lista), meusAgora));
       // Só há o que escolher com DOIS ou mais canais elegíveis — com um, a
       // escolha já está feita (critério de aceite: o fluxo segue direto).
       if (elegiveis.length > 1) {
