@@ -46,6 +46,7 @@ import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { createClient } from "@/lib/supabase/server";
+import { ehAdminDaConexao, ehResponsavelDoNumero } from "@/lib/channels/dono-do-numero";
 import { getWahaClient, wahaFriendlyError } from "@/lib/waha/client";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { traduzirLimiteDoPlano } from "@/lib/cobranca/limites";
@@ -73,7 +74,8 @@ export async function POST(
   const parsedBody = reconnectSchema.safeParse(rawBody ?? {});
   const force = parsedBody.success ? (parsedBody.data.force ?? false) : false;
 
-  const authz = await requireRole("admin", {
+  // Fork ASK (10/11): o vendedor reconecta o PRÓPRIO número (responsável no roteamento), sem logout; o resto segue só admin.
+  const authz = await requireRole("agent", {
     requestId,
     resource: "channel_sessions",
     allowPlatformAdmin: true,
@@ -81,6 +83,13 @@ export async function POST(
   if (!authz.ok) return authz.response;
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
+  const ehAdmin = ehAdminDaConexao(user, activeOrg.role);
+  if (!ehAdmin) {
+    if (force) return fail("forbidden", t("Só o administrador pode desconectar o número (logout)."), 403, { requestId });
+    if (!(await ehResponsavelDoNumero(activeOrg.orgId, id, user.id))) {
+      return fail("forbidden", t("Você só pode reconectar o número em que é o responsável."), 403, { requestId });
+    }
+  }
   if (await mfaEmDivida()) return fail("mfa_required", "Confirme a verificação em duas etapas.", 403, { requestId });
 
   const supabase = await createClient();
@@ -193,7 +202,7 @@ export async function POST(
       : waha.startSession(nomeParaOTransporte))) as { status?: string };
     const nextStatus = remote.status ?? "STARTING";
     const patch = { status: nextStatus, status_reason: null, last_status_change_at: new Date().toISOString(), consecutive_health_fails: 0 };
-    const { error: syncError } = await supabase.from("channel_sessions").update(patch).eq("organization_id", activeOrg.orgId).eq("id", id);
+    const { error: syncError } = await (ehAdmin ? supabase : createAdminClient()).from("channel_sessions").update(patch).eq("organization_id", activeOrg.orgId).eq("id", id);
 
     if (syncError) throw new Error("connection_sync_failed");
 
@@ -219,7 +228,7 @@ export async function POST(
     return ok({ id, status: nextStatus, force }, { requestId });
   } catch (err) {
     if (err instanceof ChannelConnectionError) return fail(err.code, "Uma conexão está em andamento. Aguarde e tente novamente.", err.status, { requestId });
-    await supabase.from("channel_sessions").update({ status: "FAILED", status_reason: "connection_repair_required", last_status_change_at: new Date().toISOString() })
+    await (ehAdmin ? supabase : createAdminClient()).from("channel_sessions").update({ status: "FAILED", status_reason: "connection_repair_required", last_status_change_at: new Date().toISOString() })
       .eq("organization_id", activeOrg.orgId).eq("id", id);
     return fail("waha_error", wahaFriendlyError(err), 502, { requestId });
   }

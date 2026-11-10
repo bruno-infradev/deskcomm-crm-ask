@@ -27,6 +27,7 @@ import { loadAuthUser } from "@/lib/auth/server";
 import { orgAtivaDaApi } from "@/lib/auth/require-role";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { createClient } from "@/lib/supabase/server";
+import { ehAdminDaConexao, ehResponsavelDoNumero } from "@/lib/channels/dono-do-numero";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,10 @@ export async function GET(
   if (!ativa.ok) return ativa.response;
   const activeOrg = ativa.org;
   if (!activeOrg) return new NextResponse(null, { status: 403 });
+  // Fork ASK (10/11): QR só para o admin ou para o responsável do número (o QR de outro número deixaria parear o celular errado).
+  if (!ehAdminDaConexao(user, activeOrg.role) && !(await ehResponsavelDoNumero(activeOrg.orgId, id, user.id))) {
+    return new NextResponse(null, { status: 403 });
+  }
 
   const supabase = await createClient();
   const buscar = (colunas: string) =>

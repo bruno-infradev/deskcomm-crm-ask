@@ -892,6 +892,15 @@ export const NAV_CATALOG = [
     modulo: "honorarios",
   },
   {
+    href: "/app/meus-numeros",
+    label: "Meus números",
+    description: "Os WhatsApp em que você é o responsável, com o botão de reconectar.",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+  },
+  {
     href: "/app/abordagem",
     label: "Abordagem do dia",
     description: "Pessoas abordadas hoje por vendedor, contra a meta diária.",
