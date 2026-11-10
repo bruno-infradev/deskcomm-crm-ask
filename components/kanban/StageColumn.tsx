@@ -10,6 +10,8 @@ import { intervaloDaColuna } from "@/lib/kanban/selecao";
 import { formatSomaPorMoeda, formatValorDoNegocio, MOEDA_PADRAO, somaPorMoeda } from "@/lib/money";
 import { KanbanCard, type GestoDeSelecao } from "./KanbanCard";
 
+const CARDS_POR_BLOCO = 100;
+
 interface StageColumnProps {
   stage: Stage;
   leads: Lead[];
@@ -120,6 +122,13 @@ export function StageColumn({
           moedaDoLead,
         );
 
+  // Fork ASK: a coluna desenha os cards em blocos de CARDS_POR_BLOCO. Desenhar
+  // ~3 mil cards de uma vez levava a tela do admin a 36 s. Contagem, totais,
+  // seleção da etapa e filtros seguem valendo para a lista inteira; só o
+  // desenho é parcial. Os primeiros N cards são os mesmos da lista completa,
+  // então o índice do arraste continua o mesmo.
+  const [limiteDeCards, setLimiteDeCards] = useState(CARDS_POR_BLOCO);
+  const leadsDesenhados = leads.length > limiteDeCards ? leads.slice(0, limiteDeCards) : leads;
   const idsVisiveis = leads.map((l) => l.id);
   const selecionadosAqui = idsVisiveis.filter((id) => selectedLeadIds?.has(id)).length;
   const todosSelecionados = idsVisiveis.length > 0 && selecionadosAqui === idsVisiveis.length;
@@ -267,7 +276,7 @@ export function StageColumn({
               snapshot.isDraggingOver && "bg-accent/5",
             )}
           >
-            {leads.map((lead, idx) => (
+            {leadsDesenhados.map((lead, idx) => (
               <KanbanCard
                 key={lead.id}
                 card={buildCardInput(lead, {
@@ -292,6 +301,15 @@ export function StageColumn({
               />
             ))}
             {provided.placeholder}
+            {leads.length > leadsDesenhados.length && (
+              <button
+                type="button"
+                onClick={() => setLimiteDeCards((n) => n + CARDS_POR_BLOCO)}
+                className="rounded-md border border-border-subtle px-3 py-2 text-[12px] text-text-muted hover:bg-surface-elevated hover:text-text"
+              >
+                {t("Mostrar mais")} ({leads.length - leadsDesenhados.length})
+              </button>
+            )}
             {leads.length === 0 && !snapshot.isDraggingOver && (
               <div className="flex h-20 items-center justify-center text-[11px] text-text-muted">
                 {t("vazio")}
