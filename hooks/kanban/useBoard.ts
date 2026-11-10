@@ -78,6 +78,9 @@ export function chaveDoQuadro(pipelineId: string | null) {
  * (`KanbanBoard`, com este hook para o quadro embutido), e nenhum deles quer
  * "não ler" por omissão.
  */
+/** Fork ASK: janela que junta as mudanças de fora numa recarga só do quadro. */
+const RECARGA_JUNTA_MS = 8000;
+
 export function useBoard(
   pipelineId: string | null,
   leadPedido: string | null = null,
@@ -97,6 +100,7 @@ export function useBoard(
    */
   const [pulses, setPulses] = useState<Map<string, number>>(new Map());
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const recargaAgendada = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const query = useQuery({
     queryKey,
@@ -111,10 +115,15 @@ export function useBoard(
 
   const onChange = useCallback(
     (payload: unknown) => {
-      // Conservative: invalidate the board on any change. Optimistic patches
-      // arrive faster via useMoveCard's onMutate; this just reconciles
-      // cross-user changes within ~250ms.
-      qc.invalidateQueries({ queryKey });
+      // Fork ASK (10/11): o quadro de ~1.000 leads era buscado de novo a CADA mudança em qualquer lead do funil e piscava/travava
+      // para a vendedora. Agora as mudanças de fora se juntam numa recarga só, no máximo a cada 8 s (o movimento da própria pessoa
+      // continua instantâneo pelo onMutate do useMoveCard).
+      if (!recargaAgendada.current) {
+        recargaAgendada.current = setTimeout(() => {
+          recargaAgendada.current = null;
+          qc.invalidateQueries({ queryKey });
+        }, RECARGA_JUNTA_MS);
+      }
 
       const leadId = idDoEvento(payload);
       // Janela, não marca gasta por evento: uma ação minha chega aqui em DUAS
@@ -181,6 +190,7 @@ export function useBoard(
     const pendentes = timers.current;
     return () => {
       for (const t of pendentes.values()) clearTimeout(t);
+      if (recargaAgendada.current) clearTimeout(recargaAgendada.current);
       pendentes.clear();
     };
   }, []);

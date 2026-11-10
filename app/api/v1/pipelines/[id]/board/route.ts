@@ -58,6 +58,11 @@ interface RouteCtx {
  * `organization_id` é filtrado explicitamente — vem do pipeline já validado pela
  * RLS do caller, nunca do body.
  */
+// Fork ASK (10/11/2026, Bruno: "remova o que não é útil e atrapalha a performance"): a ASK não usa agente de IA, pontuação nem
+// próxima ação de IA (0 linhas no banco), e o quadro buscava tudo isso a cada abertura, com escrita na caixa de IA no meio da leitura.
+// Com ASK_QUADRO_SEM_IA=1 essas duas etapas saem do caminho; o resto do quadro (tarefas, conversa, etiquetas) fica igual.
+const QUADRO_SEM_IA = process.env.ASK_QUADRO_SEM_IA === "1";
+
 async function withOwnerAgents(
   supabase: Awaited<ReturnType<typeof createClient>>,
   organizationId: string,
@@ -197,7 +202,7 @@ async function withScores(
   organizationId: string,
   leads: Lead[],
 ): Promise<{ leads: Lead[]; error: string | null }> {
-  if (leads.length === 0) return { leads, error: null };
+  if (leads.length === 0 || QUADRO_SEM_IA) return { leads, error: null };
 
   const { data, error } = await buscaEmLotes(
     leads.map((l) => l.id),
@@ -391,6 +396,7 @@ async function withNextActions(
   leads: Lead[],
   defaultPipelineId: string | null,
 ): Promise<{ leads: Lead[]; error: string | null }> {
+  if (QUADRO_SEM_IA) return { leads, error: null };
   const contactIds = [
     ...new Set(leads.map((l) => l.contact_id).filter((c): c is string => !!c)),
   ];
