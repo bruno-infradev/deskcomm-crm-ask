@@ -16,6 +16,7 @@ import { fail, ok } from "@/lib/api/wrappers";
 import { isServiceRoleConfigured } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { abordagemPorHora } from "@/lib/metrics/abordagem-por-hora";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ interface LinhaMensagem {
   channel_session_id: string;
   contact_id: string | null;
   direction: string;
+  created_at: string;
 }
 
 const hojeEmSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -83,7 +85,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
     const { data, error } = await admin
       .from("messages")
-      .select("channel_session_id, contact_id, direction, conversations!inner(is_group)")
+      .select("channel_session_id, contact_id, direction, created_at, conversations!inner(is_group)")
       .eq("organization_id", orgId)
       .eq("conversations.is_group", false)
       .in("channel_session_id", idsSessoes)
@@ -119,6 +121,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       meta,
       mensagens_enviadas: saida.length,
       responderam: [...abordados].filter((c) => entrada.has(c)).length,
+      por_hora: abordagemPorHora(linhas.filter((l) => idsDele.has(l.channel_session_id))),
       numeros: doVendedor.map((s) => {
         const saidaDoNumero = saida.filter((l) => l.channel_session_id === s.id);
         return {

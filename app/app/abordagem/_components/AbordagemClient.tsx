@@ -14,6 +14,12 @@ interface NumeroAbordagem {
   abordados: number;
   mensagens_enviadas: number;
 }
+interface HoraAbordagem {
+  hora: number;
+  abordados: number;
+  mensagens: number;
+  respostas: number;
+}
 interface VendedorAbordagem {
   user_id: string;
   nome: string;
@@ -22,6 +28,7 @@ interface VendedorAbordagem {
   mensagens_enviadas: number;
   responderam: number;
   numeros: NumeroAbordagem[];
+  por_hora: HoraAbordagem[];
 }
 interface RespostaAbordagem {
   dia: string;
@@ -68,6 +75,60 @@ function CartaoDoVendedor({ v }: { v: VendedorAbordagem }) {
   );
 }
 
+const horaAtualEmSP = () => Number(new Date().toLocaleString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false })) % 24;
+
+function TabelaHoraAHora({ vendedores, dia, meta }: { vendedores: VendedorAbordagem[]; dia: string; meta: number }) {
+  const agora = horaAtualEmSP();
+  const ehHoje = dia === new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const horas = vendedores[0]?.por_hora.map((h) => h.hora) ?? [];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Hora a hora</CardTitle>
+        <p className="text-xs text-muted-foreground">Cada célula: pessoas abordadas na hora (primeira mensagem do dia), mensagens enviadas e respostas. A linha de baixo é o acumulado contra a meta de {meta}.</p>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <table className="w-full border-collapse text-center text-xs tabular-nums">
+          <thead>
+            <tr>
+              <th className="sticky left-0 bg-card px-2 py-1 text-left font-medium">Vendedor</th>
+              {horas.map((h) => (
+                <th key={h} className={`px-2 py-1 font-medium ${ehHoje && h === agora ? "rounded bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{h}h</th>
+              ))}
+              <th className="px-2 py-1 font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vendedores.map((v) => {
+              let acumulado = 0;
+              return (
+                <tr key={v.user_id} className="border-t align-top">
+                  <td className="sticky left-0 bg-card px-2 py-1.5 text-left font-medium">{v.nome}</td>
+                  {v.por_hora.map((h) => {
+                    acumulado += h.abordados;
+                    const vazio = h.mensagens === 0 && h.respostas === 0;
+                    return (
+                      <td key={h.hora} className={`px-2 py-1.5 ${ehHoje && h.hora === agora ? "bg-primary/10" : ""}`}>
+                        <div className={`text-sm font-semibold ${vazio ? "text-muted-foreground/40" : ""}`}>{h.abordados}</div>
+                        <div className="text-[10px] text-muted-foreground">{vazio ? "·" : `${h.mensagens}m ${h.respostas}r`}</div>
+                        <div className={`text-[10px] ${acumulado >= meta ? "text-green-600" : "text-muted-foreground"}`}>{ehHoje && h.hora > agora ? "" : `${acumulado}/${meta}`}</div>
+                      </td>
+                    );
+                  })}
+                  <td className="px-2 py-1.5">
+                    <div className="text-sm font-semibold">{v.abordados}</div>
+                    <div className="text-[10px] text-muted-foreground">{v.mensagens_enviadas}m {v.responderam}r</div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AbordagemClient() {
   const [dados, setDados] = useState<RespostaAbordagem | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -99,6 +160,7 @@ export function AbordagemClient() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {dados.vendedores.map((v) => <CartaoDoVendedor key={v.user_id} v={v} />)}
       </div>
+      <TabelaHoraAHora vendedores={dados.vendedores} dia={dados.dia} meta={dados.meta} />
     </div>
   );
 }
