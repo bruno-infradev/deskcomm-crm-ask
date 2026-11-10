@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { fail, ok } from "@/lib/api/wrappers";
 import { isServiceRoleConfigured } from "@/lib/audit";
+import { resolveAuthDual } from "@/lib/api/auth-dual";
 import { requireRole } from "@/lib/auth/require-role";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { abordagemPorHora } from "@/lib/metrics/abordagem-por-hora";
@@ -42,8 +43,24 @@ const hojeEmSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "Ameri
 
 export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
-  const authz = await requireRole("agent", { requestId, resource: "metrics" });
-  if (!authz.ok) return authz.response;
+  // Sessão (vendedor vê a própria linha, manager+ vê todos) OU Bearer do OS (só leitura, vê todos): o aviso das
+  // 30 abordagens e o resumo das 18h rodam por script do OS (Marcos, 10/11/2026).
+  const ehBearer = (req.headers.get("authorization") ?? "").toLowerCase().startsWith("bearer ");
+  let orgId: string;
+  let veTodos: boolean;
+  let usuarioId: string | null = null;
+  if (ehBearer) {
+    const dual = await resolveAuthDual(req, { requestId, resource: "metrics", role: "agent", scope: "mcp:read" });
+    if (!dual.ok) return dual.response;
+    orgId = dual.organizationId;
+    veTodos = true;
+  } else {
+    const authz = await requireRole("agent", { requestId, resource: "metrics" });
+    if (!authz.ok) return authz.response;
+    orgId = authz.org.orgId;
+    veTodos = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
+    usuarioId = authz.user.id;
+  }
   if (!isServiceRoleConfigured()) {
     return fail("service_unavailable", "Leitura administrativa não configurada.", 503, { requestId });
   }
@@ -63,8 +80,6 @@ export async function GET(req: NextRequest): Promise<Response> {
   const meta = parsed.data.meta ?? META_PADRAO;
   const inicio = new Date(`${dia}T00:00:00${FUSO_SP}`);
   const fim = new Date(inicio.getTime() + 24 * 60 * 60 * 1000);
-  const orgId = authz.org.orgId;
-  const veTodos = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
 
   const admin = createAdminClient();
   const [{ data: sessoes, error: e1 }, { data: politicas, error: e2 }] = await Promise.all([
@@ -98,7 +113,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     if ((data ?? []).length < PAGINA) break;
   }
 
-  const idsVendedores = [...new Set(donoDaSessao.values())].filter((id) => veTodos || id === authz.user.id);
+  const idsVendedores = [...new Set(donoDaSessao.values())].filter((id) => veTodos || id === usuarioId);
   const nomes = new Map<string, string>();
   await Promise.all(
     idsVendedores.map(async (id) => {
@@ -114,6 +129,11 @@ export async function GET(req: NextRequest): Promise<Response> {
     const saida = linhas.filter((l) => idsDele.has(l.channel_session_id) && l.direction === "outbound" && l.contact_id);
     const entrada = new Set(linhas.filter((l) => idsDele.has(l.channel_session_id) && l.direction === "inbound" && l.contact_id).map((l) => l.contact_id as string));
     const abordados = new Set(saida.map((l) => l.contact_id as string));
+    const primeiras = new Map<string, string>();
+    for (const l of [...saida].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+      if (!primeiras.has(l.contact_id as string)) primeiras.set(l.contact_id as string, l.created_at);
+    }
+    const horaDaMeta = [...primeiras.values()].sort()[meta - 1];
     return {
       user_id: userId,
       nome: nomes.get(userId) ?? "Sem nome",
@@ -121,6 +141,9 @@ export async function GET(req: NextRequest): Promise<Response> {
       meta,
       mensagens_enviadas: saida.length,
       responderam: [...abordados].filter((c) => entrada.has(c)).length,
+      cruzou_meta_as: horaDaMeta
+        ? new Date(horaDaMeta).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })
+        : null,
       por_hora: abordagemPorHora(linhas.filter((l) => idsDele.has(l.channel_session_id))),
       numeros: doVendedor.map((s) => {
         const saidaDoNumero = saida.filter((l) => l.channel_session_id === s.id);
