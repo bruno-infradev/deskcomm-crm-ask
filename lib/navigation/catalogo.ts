@@ -892,6 +892,15 @@ export const NAV_CATALOG = [
     modulo: "honorarios",
   },
   {
+    href: "/app/links-de-venda",
+    label: "Links de venda",
+    description: "Os links de pagamento da Hubla por produto e valor, com botão de copiar.",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+  },
+  {
     href: "/app/meus-numeros",
     label: "Meus números",
     description: "Os WhatsApp em que você é o responsável, com o botão de reconectar.",

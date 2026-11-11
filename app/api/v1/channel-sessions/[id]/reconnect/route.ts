@@ -189,9 +189,21 @@ export async function POST(
       return fail("internal_error", t("Não foi possível concluir a conexão. Tente novamente."), 500, { requestId });
     }
     await waha.stopSession(nomeParaOTransporte);
-    // Só no modo forçado: descartar a credencial é irreversível — obriga a
-    // reescanear o QR mesmo que ela ainda estivesse boa.
-    if (force) await waha.logoutSession(nomeParaOTransporte);
+    // Fork ASK (11/11/2026, caso João Paulo): sessão PRESA em FAILED no WAHA (o WhatsApp removeu o aparelho,
+    // `device_removed`) não volta com stop + start: o start devolve FAILED e o QR nunca sai, e o vendedor, que
+    // não é admin, não tem o modo forçado. Nesse estado a credencial já está morta, então descartá-la (logout) não
+    // perde nada e é o único caminho para o QR aparecer.
+    let sessaoPresa = false;
+    if (!force && (session.status === "FAILED" || session.status === "STOPPED")) {
+      try {
+        sessaoPresa = (await waha.getSessionQr(nomeParaOTransporte)).status === "FAILED";
+      } catch {
+        sessaoPresa = false;
+      }
+    }
+    // Modo forçado (admin): descartar a credencial é irreversível — obriga a reescanear o QR mesmo que ela
+    // ainda estivesse boa.
+    if (force || sessaoPresa) await waha.logoutSession(nomeParaOTransporte);
     // Com a opção de acervo ligada nesta conexão, o start também converge o
     // store (num número já pareado, guarda daqui em diante). Desligada, a
     // chamada é a de sempre, sem segundo argumento — e o store fica como o
