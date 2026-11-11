@@ -10,6 +10,8 @@ import { useMoveCard, type MoveArgs, type RecusaDeCampos, type RetomadaPendente 
 import { useRenameStage } from "@/hooks/kanban/useRenameStage";
 import { CamposObrigatoriosDialog } from "./CamposObrigatoriosDialog";
 import { LoseLeadDialog } from "./LoseLeadDialog";
+import { RetomarEmDialog } from "./RetomarEmDialog";
+import { ehEtapaFollowUpFuturo, CHAVE_RETOMAR_EM } from "@/lib/leads/follow-up-futuro";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
 import { useReactivations } from "@/hooks/leads/useReactivations";
@@ -124,6 +126,8 @@ export function KanbanBoard({
   const [recusaDeCampos, setRecusaDeCampos] = useState<RecusaDeCampos | null>(null);
   const [retomada, setRetomada] = useState<RetomadaPendente | null>(null);
   const [perdaPendente, setPerdaPendente] = useState<MoveArgs | null>(null);
+  // Follow up futuro (fork ASK): quem chega à etapa escolhe quando retomar antes do move.
+  const [retomarEmPendente, setRetomarEmPendente] = useState<MoveArgs | null>(null);
   const moveCard = useMoveCard(pipelineId, {
     onCamposFaltando: setRecusaDeCampos,
     onRetomada: setRetomada,
@@ -237,6 +241,10 @@ export function KanbanBoard({
         lead && (lead.status === "lost" || lead.stage_id === args.stageId) ? lead.lost_reason : null;
       if (!decideMotivoDaPerda({ etapaDeDestino: etapa, motivoAtual }).ok) {
         setPerdaPendente(args);
+        return;
+      }
+      if (ehEtapaFollowUpFuturo(etapa) && lead && lead.stage_id !== args.stageId) {
+        setRetomarEmPendente(args);
         return;
       }
       moveCard.mutate(args);
@@ -461,6 +469,20 @@ export function KanbanBoard({
           if (!perdaPendente) return;
           setPerdaPendente(null);
           moveCard.mutate({ ...perdaPendente, lostReason });
+        }}
+      />
+      <RetomarEmDialog
+        key={retomarEmPendente?.leadId ?? "fechado-retomar"}
+        open={retomarEmPendente !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) setRetomarEmPendente(null);
+        }}
+        submitting={moveCard.isPending}
+        onConfirm={(dataIso) => {
+          if (!retomarEmPendente) return;
+          const args = retomarEmPendente;
+          setRetomarEmPendente(null);
+          moveCard.mutate({ ...args, customFields: { ...(args.customFields ?? {}), [CHAVE_RETOMAR_EM]: dataIso } });
         }}
       />
       {retomada && (

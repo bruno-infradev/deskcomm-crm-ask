@@ -15,6 +15,7 @@ import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { OwnerBadge } from "./OwnerBadge";
 import { ContatoNoCard } from "./ContatoNoCard";
+import { dataBr, dataDeRetomada } from "@/lib/leads/follow-up-futuro";
 import { ArquivosNoCard } from "./ArquivosNoCard";
 import { TarefasNoCard } from "./TarefasNoCard";
 
@@ -407,6 +408,13 @@ export function KanbanCard({
               />
             )}
           </div>
+
+          {/* Follow up futuro (fork ASK): a data em que o lead volta para Follow up. Aparece também no compacto: é o que se lê de relance. */}
+          {dataDeRetomada(lead) && lead.status === "open" ? (
+            <p data-testid="card-retomar-em" className="text-xs text-text-muted">
+              {t("Retomar em")} {dataBr(dataDeRetomada(lead) as string)}
+            </p>
+          ) : null}
 
           {/* A última mensagem, com atalho para o inbox. Fica ANTES do rodapé
               de dono/tempo porque é conteúdo do negócio, não metadado do card —
