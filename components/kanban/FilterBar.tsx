@@ -29,6 +29,12 @@ import {
 } from "@/lib/kanban/filters";
 import { categoriaDoMotivo } from "@/lib/leads/motivos-de-perda-do-funil";
 import { rotuloDoMotivoDePerda } from "@/lib/schemas/leads";
+import {
+  CHAVES_DE_RESPOSTA,
+  ROTULO_DA_RESPOSTA,
+  opcoesDaResposta,
+  type ChaveDeResposta,
+} from "@/lib/leads/respostas-do-popup";
 import { cn } from "@/lib/utils";
 import { rotuloDoMembro } from "@/lib/users/rotulo-do-atendente";
 
@@ -188,6 +194,27 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
   };
   const motivoLabel = filters.lostReason ? rotuloDoMotivo(filters.lostReason) : t("Todos");
   const categoriaLabel = filters.lostCategory ?? t("Todas");
+
+  /**
+   * Respostas do popup das páginas (fork ASK): tem clínica, injetáveis, área e faturamento. As opções são os
+   * valores que existem nos leads carregados (um valor que nenhum card tem nunca acharia nada); marcar mais de
+   * um valor da MESMA pergunta é OU, e perguntas diferentes se somam (E).
+   */
+  const opcoesDeResposta = useMemo(
+    () =>
+      Object.fromEntries(
+        CHAVES_DE_RESPOSTA.map((chave) => [chave, opcoesDaResposta(leads, chave)]),
+      ) as Record<ChaveDeResposta, string[]>,
+    [leads],
+  );
+  const alternaResposta = (chave: ChaveDeResposta, valor: string) => {
+    const atuais = filters.respostas?.[chave] ?? [];
+    const proximos = atuais.includes(valor) ? atuais.filter((v) => v !== valor) : [...atuais, valor];
+    const respostas = { ...(filters.respostas ?? {}), [chave]: proximos };
+    if (proximos.length === 0) delete respostas[chave];
+    onChange({ ...filters, respostas: Object.keys(respostas).length > 0 ? respostas : undefined });
+  };
+  const temRespostaFiltrada = Object.values(filters.respostas ?? {}).some((v) => v.length > 0);
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
@@ -365,6 +392,45 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {CHAVES_DE_RESPOSTA.map((chave) => {
+        const opcoes = opcoesDeResposta[chave];
+        const escolhidos = filters.respostas?.[chave] ?? [];
+        const rotulo = t(ROTULO_DA_RESPOSTA[chave]);
+        return (
+          <DropdownMenu key={chave}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={opcoes.length === 0}
+                data-testid={`filtro-resposta-${chave}`}
+                className={cn(escolhidos.length > 0 && "border-accent bg-accent/10")}
+              >
+                {escolhidos.length === 0
+                  ? `${rotulo}: ${t("todas")}`
+                  : escolhidos.length === 1
+                    ? `${rotulo}: ${escolhidos[0]}`
+                    : `${rotulo}: ${escolhidos[0]} +${escolhidos.length - 1}`}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuLabel>{rotulo}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {opcoes.map((valor) => (
+                <DropdownMenuCheckboxItem
+                  key={valor}
+                  checked={escolhidos.includes(valor)}
+                  onCheckedChange={() => alternaResposta(chave, valor)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {valor}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      })}
+
       <label
         className={cn(
           "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm",
@@ -385,6 +451,7 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
         filters.overdueOnly ||
         filters.lostReason ||
         filters.lostCategory ||
+        temRespostaFiltrada ||
         (filters.status && filters.status !== "all")) && (
         <Button
           variant="ghost"

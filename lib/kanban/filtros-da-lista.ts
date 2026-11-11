@@ -55,7 +55,7 @@ export function paramsDosFiltrosDaLista(f: FiltrosDaLista): string {
 }
 
 /** Os filtros da barra que a Lista AINDA não aplica — nomes estáveis, a tela traduz. */
-export type FiltroForaDaLista = "busca" | "etiqueta" | "atrasados" | "motivo" | "categoria";
+export type FiltroForaDaLista = "busca" | "etiqueta" | "atrasados" | "motivo" | "categoria" | "respostas";
 
 /**
  * Quais filtros ATIVOS a Lista está ignorando. Lista vazia = o que a tela mostra
@@ -68,6 +68,7 @@ export function filtrosForaDaLista(f: LeadFilters): FiltroForaDaLista[] {
   if (f.overdueOnly) fora.push("atrasados");
   if (f.lostReason) fora.push("motivo");
   if (f.lostCategory) fora.push("categoria");
+  if (Object.values(f.respostas ?? {}).some((v) => v.length > 0)) fora.push("respostas");
   return fora;
 }
 

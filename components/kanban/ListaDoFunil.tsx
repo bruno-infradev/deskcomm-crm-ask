@@ -112,6 +112,7 @@ export function ListaDoFunil({ pipelineId, pipeline: funil, stages, filtros = SE
       atrasados: t("Apenas atrasados"),
       motivo: t("Motivo"),
       categoria: t("Categoria"),
+      respostas: t("Respostas do formulário"),
     })[f];
 
   const leads = data?.leads ?? [];

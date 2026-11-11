@@ -1,4 +1,9 @@
 import type { Lead } from "@/lib/types/leads";
+import {
+  CHAVES_DE_RESPOSTA,
+  passaNasRespostas,
+  type FiltroDeRespostas,
+} from "@/lib/leads/respostas-do-popup";
 import { diaDeHojeLocal } from "@/lib/ai/pacing-knobs";
 import { cardTemMarcador, cardTemTodasNaMesmaCaixa } from "@/lib/kanban/marcadores-do-card";
 import {
@@ -67,6 +72,8 @@ export interface LeadFilters {
   lostReason?: string;
   /** A categoria do motivo de perda (issue #1537), resolvida no funil. */
   lostCategory?: string;
+  /** Respostas do popup (fork ASK): tem clínica, injetáveis, área e faturamento. OU dentro da pergunta, E entre perguntas. */
+  respostas?: FiltroDeRespostas;
 }
 
 /**
@@ -126,7 +133,20 @@ export function filtersFromParams(
     overdueOnly: sp.get("overdue") === "1" || undefined,
     lostReason: sp.get("motivo") ?? undefined,
     lostCategory: sp.get("categoria") ?? undefined,
+    ...respostasDosParams(sp),
   };
+}
+
+function respostasDosParams(
+  sp: { get(key: string): string | null; getAll?: (key: string) => string[] },
+): { respostas?: FiltroDeRespostas } {
+  if (typeof sp.getAll !== "function") return {};
+  const respostas: Record<string, string[]> = {};
+  for (const chave of CHAVES_DE_RESPOSTA) {
+    const valores = sp.getAll(`r_${chave}`).filter((v) => v.trim() !== "");
+    if (valores.length > 0) respostas[chave] = valores;
+  }
+  return Object.keys(respostas).length > 0 ? { respostas } : {};
 }
 
 export function filtersToParams(f: LeadFilters): string {
@@ -141,6 +161,9 @@ export function filtersToParams(f: LeadFilters): string {
   if (f.overdueOnly) p.set("overdue", "1");
   if (f.lostReason) p.set("motivo", f.lostReason);
   if (f.lostCategory) p.set("categoria", f.lostCategory);
+  for (const chave of CHAVES_DE_RESPOSTA) {
+    for (const valor of f.respostas?.[chave] ?? []) p.append(`r_${chave}`, valor);
+  }
   return p.toString();
 }
 
@@ -222,6 +245,7 @@ export function applyFilters(
     // no contato ou na conversa sem casar card nenhum. O E/OU mora em
     // `passaMarcador`, lá em cima.
     if (!passaMarcador(l)) return false;
+    if (!passaNasRespostas(l, f.respostas)) return false;
     if (
       search &&
       !`${l.title} ${l.description ?? ""} ${l.contact_phone ?? ""}`.toLowerCase().includes(search) &&
