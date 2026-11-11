@@ -20,7 +20,34 @@ interface HoraAbordagem {
   mensagens: number;
   respostas: number;
 }
-interface VendedorAbordagem {
+interface ResumoVendas {
+  qtd: number;
+  valor_reais: number;
+  hubla: { qtd: number; valor_reais: number };
+  fora_da_hubla: { qtd: number; valor_reais: number };
+}
+interface RespostaDoVendedor {
+  media_minutos: number | null;
+  respondidos: number;
+  sem_resposta: number;
+}
+interface OrigemAbordagem {
+  origem: string;
+  abordados: number;
+  responderam: number;
+  taxa_resposta: number | null;
+  vendas: number;
+  valor_reais: number;
+}
+interface Resultado {
+  reunioes_marcadas: number;
+  reunioes_feitas: number;
+  propostas: number;
+  vendas: ResumoVendas;
+  resposta_do_vendedor: RespostaDoVendedor;
+  por_origem: OrigemAbordagem[];
+}
+interface VendedorAbordagem extends Resultado {
   user_id: string;
   nome: string;
   abordados: number;
@@ -34,6 +61,7 @@ interface RespostaAbordagem {
   dia: string;
   meta: number;
   vendedores: VendedorAbordagem[];
+  time: Resultado & { abordados: number; responderam: number };
 }
 
 function dataBR(iso: string): string {
@@ -43,6 +71,61 @@ function dataBR(iso: string): string {
 
 /** Taxa de resposta do dia (Bruno, 11/11): quem respondeu entre as pessoas abordadas hoje. Sem abordado, sem taxa. */
 const taxaDeResposta = (responderam: number, abordados: number): string => (abordados > 0 ? `${Math.round((responderam / abordados) * 100)}%` : "–");
+
+const reais = (n: number): string => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const MINUTOS_POR_HORA = 60;
+const tempo = (min: number | null): string => (min === null ? "–" : min < MINUTOS_POR_HORA ? `${min} min` : `${Math.floor(min / MINUTOS_POR_HORA)} h ${min % MINUTOS_POR_HORA} min`);
+
+function LinhasDeResultado({ r }: { r: Resultado }) {
+  return (
+    <dl className="grid grid-cols-2 gap-2 border-t pt-3 text-sm">
+      <div><dt className="text-muted-foreground">Reuniões marcadas</dt><dd className="tabular-nums" data-testid="reunioes-marcadas">{r.reunioes_marcadas}</dd></div>
+      <div><dt className="text-muted-foreground">Reuniões feitas</dt><dd className="tabular-nums">{r.reunioes_feitas}</dd></div>
+      <div><dt className="text-muted-foreground">Propostas</dt><dd className="tabular-nums">{r.propostas}</dd></div>
+      <div><dt className="text-muted-foreground">Vendas</dt><dd className="tabular-nums" data-testid="vendas">{r.vendas.qtd} <span className="text-muted-foreground">({reais(r.vendas.valor_reais)})</span></dd></div>
+      <div><dt className="text-muted-foreground">Tempo até responder</dt><dd className="tabular-nums">{tempo(r.resposta_do_vendedor.media_minutos)}</dd></div>
+      <div><dt className="text-muted-foreground">Sem resposta agora</dt><dd className="tabular-nums">{r.resposta_do_vendedor.sem_resposta}</dd></div>
+    </dl>
+  );
+}
+
+function TabelaPorOrigem({ origens }: { origens: OrigemAbordagem[] }) {
+  if (origens.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Conversão por origem (time)</CardTitle>
+        <p className="text-xs text-muted-foreground">Pessoas abordadas hoje, agrupadas pela tag de origem do lead. Um lead com mais de uma origem aparece em cada uma.</p>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm tabular-nums">
+          <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 font-medium">Origem</th><th className="font-medium">Abordados</th><th className="font-medium">Responderam</th><th className="font-medium">Taxa</th><th className="font-medium">Vendas</th><th className="font-medium">Valor</th></tr></thead>
+          <tbody>
+            {origens.map((o) => (
+              <tr key={o.origem} className="border-t">
+                <td className="py-1.5 font-medium">{o.origem}</td><td>{o.abordados}</td><td>{o.responderam}</td><td>{o.taxa_resposta === null ? "–" : `${o.taxa_resposta}%`}</td><td>{o.vendas}</td><td>{reais(o.valor_reais)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CartaoDoTime({ t }: { t: RespostaAbordagem["time"] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-baseline justify-between gap-2">
+          <span>Time</span>
+          <span className="text-base font-normal text-muted-foreground">{t.abordados} abordados · {t.responderam} responderam ({taxaDeResposta(t.responderam, t.abordados)})</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent><LinhasDeResultado r={t} /></CardContent>
+    </Card>
+  );
+}
 
 function CartaoDoVendedor({ v }: { v: VendedorAbordagem }) {
   const pct = Math.min(100, Math.round((v.abordados / v.meta) * 100));
@@ -65,6 +148,7 @@ function CartaoDoVendedor({ v }: { v: VendedorAbordagem }) {
           <div><dt className="text-muted-foreground">Mensagens enviadas</dt><dd className="tabular-nums">{v.mensagens_enviadas}</dd></div>
           <div><dt className="text-muted-foreground">Responderam hoje</dt><dd className="tabular-nums" data-testid="taxa-de-resposta">{v.responderam} <span className="text-muted-foreground">({taxaDeResposta(v.responderam, v.abordados)})</span></dd></div>
         </dl>
+        <LinhasDeResultado r={v} />
         <ul className="divide-y text-sm">
           {v.numeros.map((n) => (
             <li key={n.session_id} className="flex items-center justify-between py-1.5">
@@ -164,6 +248,8 @@ export function AbordagemClient() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {dados.vendedores.map((v) => <CartaoDoVendedor key={v.user_id} v={v} />)}
       </div>
+      <CartaoDoTime t={dados.time} />
+      <TabelaPorOrigem origens={dados.time.por_origem} />
       <TabelaHoraAHora vendedores={dados.vendedores} dia={dados.dia} meta={dados.meta} />
     </div>
   );

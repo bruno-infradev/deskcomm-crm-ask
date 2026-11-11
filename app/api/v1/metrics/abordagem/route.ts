@@ -18,6 +18,14 @@ import { resolveAuthDual } from "@/lib/api/auth-dual";
 import { requireRole } from "@/lib/auth/require-role";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { abordagemPorHora } from "@/lib/metrics/abordagem-por-hora";
+import {
+  conversaoPorOrigem,
+  formaDaVenda,
+  resumirVendas,
+  tempoDeResposta,
+  type LeadParaOrigem,
+  type VendaDoDia,
+} from "@/lib/metrics/resultado-comercial";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +45,22 @@ interface LinhaMensagem {
   contact_id: string | null;
   direction: string;
   created_at: string;
+}
+
+const CENTAVOS_POR_REAL = 100;
+const LOTE_CONTATOS = 200;
+const ETAPAS_DE_RESULTADO = ["reuniao_marcada", "reuniao_feita", "proposta_enviada"] as const;
+
+interface LeadDoDia {
+  owner_user_id: string | null;
+  contact_id: string | null;
+  tags: string[] | null;
+  value_cents: number | null;
+  custom_fields: Record<string, unknown> | null;
+}
+interface LeadEtapa {
+  owner_user_id: string | null;
+  crm_stages: { slug: string } | { slug: string }[] | null;
 }
 
 const hojeEmSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -123,6 +147,63 @@ export async function GET(req: NextRequest): Promise<Response> {
     }),
   );
 
+  const inicioIso = inicio.toISOString();
+  const fimIso = fim.toISOString();
+  const [{ data: ganhosBrutos, error: e3 }, { data: etapasBrutas, error: e4 }] = await Promise.all([
+    admin
+      .from("crm_leads")
+      .select("owner_user_id, contact_id, tags, value_cents, custom_fields")
+      .eq("organization_id", orgId)
+      .eq("status", "won")
+      .gte("closed_at", inicioIso)
+      .lt("closed_at", fimIso)
+      .in("owner_user_id", idsVendedores),
+    admin
+      .from("crm_leads")
+      .select("owner_user_id, crm_stages!inner(slug)")
+      .eq("organization_id", orgId)
+      .in("crm_stages.slug", [...ETAPAS_DE_RESULTADO])
+      .gte("stage_changed_at", inicioIso)
+      .lt("stage_changed_at", fimIso)
+      .in("owner_user_id", idsVendedores),
+  ]);
+  if (e3 || e4) return fail("internal_error", (e3 ?? e4)!.message, 500, { requestId });
+  const ganhos = (ganhosBrutos ?? []) as unknown as LeadDoDia[];
+  const etapas = (etapasBrutas ?? []) as unknown as LeadEtapa[];
+  const slugDe = (l: LeadEtapa) => (Array.isArray(l.crm_stages) ? l.crm_stages[0]?.slug : l.crm_stages?.slug);
+
+  // Leads das pessoas abordadas no dia (origem por tag), em lotes para não estourar a URL.
+  const contatosAbordados = [...new Set(linhas.filter((l) => l.direction === "outbound" && l.contact_id).map((l) => l.contact_id as string))];
+  const leadsDosAbordados: LeadDoDia[] = [];
+  for (let i = 0; i < contatosAbordados.length; i += LOTE_CONTATOS) {
+    const { data, error } = await admin
+      .from("crm_leads")
+      .select("owner_user_id, contact_id, tags, value_cents, custom_fields")
+      .eq("organization_id", orgId)
+      .in("contact_id", contatosAbordados.slice(i, i + LOTE_CONTATOS));
+    if (error) return fail("internal_error", error.message, 500, { requestId });
+    leadsDosAbordados.push(...((data ?? []) as unknown as LeadDoDia[]));
+  }
+  // O valor que o vendedor informa ao ganhar (campo venda_valor_reais) vale mais que a coluna value_cents (preço do negócio).
+  const vendaDe = (l: LeadDoDia): VendaDoDia => {
+    const informado = Number(l.custom_fields?.venda_valor_reais);
+    return {
+      valor_reais: Number.isFinite(informado) && informado > 0 ? informado : Math.round((l.value_cents ?? 0) / CENTAVOS_POR_REAL),
+      forma: formaDaVenda(l.custom_fields?.venda_forma),
+    };
+  };
+  const contatosGanhos = new Map(ganhos.filter((l) => l.contact_id).map((l) => [l.contact_id as string, vendaDe(l).valor_reais]));
+  const origemDe = (contatos: ReadonlySet<string>, entrada: ReadonlySet<string>): LeadParaOrigem[] =>
+    leadsDosAbordados
+      .filter((l) => l.contact_id && contatos.has(l.contact_id))
+      .map((l) => ({
+        abordado: true,
+        respondeu: entrada.has(l.contact_id as string),
+        tags: l.tags,
+        venda_reais: contatosGanhos.get(l.contact_id as string) ?? null,
+      }));
+
+  const doVendedorIds = (userId: string) => sessoesDosVendedores.filter((s) => donoDaSessao.get(s.id as string) === userId).map((s) => s.id as string);
   const vendedores = idsVendedores.map((userId) => {
     const doVendedor = sessoesDosVendedores.filter((s) => donoDaSessao.get(s.id as string) === userId);
     const idsDele = new Set(doVendedor.map((s) => s.id as string));
@@ -134,9 +215,19 @@ export async function GET(req: NextRequest): Promise<Response> {
       if (!primeiras.has(l.contact_id as string)) primeiras.set(l.contact_id as string, l.created_at);
     }
     const horaDaMeta = [...primeiras.values()].sort()[meta - 1];
+    const vendasDele = ganhos.filter((l) => l.owner_user_id === userId).map(vendaDe);
+    const doVendedorEtapas = etapas.filter((l) => l.owner_user_id === userId);
+    const contarEtapa = (slug: string) => doVendedorEtapas.filter((l) => slugDe(l) === slug).length;
+    const mensagensDele = linhas.filter((l) => idsDele.has(l.channel_session_id));
     return {
       user_id: userId,
       nome: nomes.get(userId) ?? "Sem nome",
+      reunioes_marcadas: contarEtapa("reuniao_marcada"),
+      reunioes_feitas: contarEtapa("reuniao_feita"),
+      propostas: contarEtapa("proposta_enviada"),
+      vendas: resumirVendas(vendasDele),
+      resposta_do_vendedor: tempoDeResposta(mensagensDele),
+      por_origem: conversaoPorOrigem(origemDe(abordados, entrada)),
       abordados: abordados.size,
       meta,
       mensagens_enviadas: saida.length,
@@ -159,5 +250,18 @@ export async function GET(req: NextRequest): Promise<Response> {
   });
   vendedores.sort((a, b) => b.abordados - a.abordados);
 
-  return ok({ dia, meta, vendedores }, { requestId });
+  const idsDoTime = new Set(vendedores.flatMap((v) => doVendedorIds(v.user_id)));
+  const entradaDoTime = new Set(linhas.filter((l) => idsDoTime.has(l.channel_session_id) && l.direction === "inbound" && l.contact_id).map((l) => l.contact_id as string));
+  const time = {
+    abordados: vendedores.reduce((s, v) => s + v.abordados, 0),
+    responderam: vendedores.reduce((s, v) => s + v.responderam, 0),
+    reunioes_marcadas: vendedores.reduce((s, v) => s + v.reunioes_marcadas, 0),
+    reunioes_feitas: vendedores.reduce((s, v) => s + v.reunioes_feitas, 0),
+    propostas: vendedores.reduce((s, v) => s + v.propostas, 0),
+    vendas: resumirVendas(ganhos.map(vendaDe)),
+    resposta_do_vendedor: tempoDeResposta(linhas.filter((l) => idsDoTime.has(l.channel_session_id))),
+    por_origem: conversaoPorOrigem(origemDe(new Set(contatosAbordados), entradaDoTime)),
+  };
+
+  return ok({ dia, meta, vendedores, time }, { requestId });
 }
