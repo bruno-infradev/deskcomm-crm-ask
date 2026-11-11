@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { fail, ok } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { slugDoVendedor } from "@/lib/leads/link-de-venda";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +26,27 @@ export async function GET(): Promise<Response> {
     .order("ordem")
     .order("rotulo");
   if (error) return fail("internal_error", (error as { message: string }).message, 500, { requestId });
-  return ok({ links: data ?? [] }, { requestId });
+  const nomeDoUsuario = authz.user.full_name?.trim() || authz.user.email;
+  const eu = { slug: slugDoVendedor(nomeDoUsuario), nome: authz.user.full_name?.trim() || nomeDoUsuario.split("@")[0] };
+  // Admin vê o link de cada vendedor (pode escolher de quem copiar); vendedor só o dele.
+  const ehAdmin = ["admin", "owner"].includes(String(authz.org.role));
+  let vendedores: Array<{ slug: string; nome: string }> = [];
+  if (ehAdmin) {
+    const admin = createAdminClient();
+    const { data: membros } = await admin
+      .from("user_organizations")
+      .select("user_id, role")
+      .eq("organization_id", authz.org.orgId)
+      .is("revoked_at", null)
+      .eq("role", "agent");
+    const lidos = await Promise.all(
+      (membros ?? []).map(async (m) => {
+        const { data: u } = await admin.auth.admin.getUserById(m.user_id as string);
+        const nome = (u?.user?.user_metadata?.full_name as string | undefined)?.trim() || (u?.user?.email ?? "").split("@")[0];
+        return nome ? { slug: slugDoVendedor(nome), nome } : null;
+      }),
+    );
+    vendedores = lidos.filter((v): v is { slug: string; nome: string } => v !== null).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+  return ok({ links: data ?? [], eu, vendedores }, { requestId });
 }
