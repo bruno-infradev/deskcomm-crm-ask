@@ -41,6 +41,9 @@ function dataBR(iso: string): string {
   return `${d}/${m}/${a}`;
 }
 
+/** Taxa de resposta do dia (Bruno, 11/11): quem respondeu entre as pessoas abordadas hoje. Sem abordado, sem taxa. */
+const taxaDeResposta = (responderam: number, abordados: number): string => (abordados > 0 ? `${Math.round((responderam / abordados) * 100)}%` : "–");
+
 function CartaoDoVendedor({ v }: { v: VendedorAbordagem }) {
   const pct = Math.min(100, Math.round((v.abordados / v.meta) * 100));
   const bateu = v.abordados >= v.meta;
@@ -60,7 +63,7 @@ function CartaoDoVendedor({ v }: { v: VendedorAbordagem }) {
         </div>
         <dl className="grid grid-cols-2 gap-2 text-sm">
           <div><dt className="text-muted-foreground">Mensagens enviadas</dt><dd className="tabular-nums">{v.mensagens_enviadas}</dd></div>
-          <div><dt className="text-muted-foreground">Responderam hoje</dt><dd className="tabular-nums">{v.responderam}</dd></div>
+          <div><dt className="text-muted-foreground">Responderam hoje</dt><dd className="tabular-nums" data-testid="taxa-de-resposta">{v.responderam} <span className="text-muted-foreground">({taxaDeResposta(v.responderam, v.abordados)})</span></dd></div>
         </dl>
         <ul className="divide-y text-sm">
           {v.numeros.map((n) => (
@@ -118,6 +121,7 @@ function TabelaHoraAHora({ vendedores, dia, meta }: { vendedores: VendedorAborda
                   <td className="px-2 py-1.5">
                     <div className="text-sm font-semibold">{v.abordados}</div>
                     <div className="text-[10px] text-muted-foreground">{v.mensagens_enviadas}m {v.responderam}r</div>
+                    <div className="text-[10px] font-medium">{taxaDeResposta(v.responderam, v.abordados)} resp.</div>
                   </td>
                 </tr>
               );
