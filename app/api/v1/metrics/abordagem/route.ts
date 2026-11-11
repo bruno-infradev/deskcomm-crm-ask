@@ -160,7 +160,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       .in("owner_user_id", idsVendedores),
     admin
       .from("crm_leads")
-      .select("owner_user_id, crm_stages!inner(slug)")
+      .select("owner_user_id, crm_stages!crm_leads_stage_id_fkey!inner(slug)")
       .eq("organization_id", orgId)
       .in("crm_stages.slug", [...ETAPAS_DE_RESULTADO])
       .gte("stage_changed_at", inicioIso)
