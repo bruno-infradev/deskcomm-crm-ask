@@ -15,6 +15,8 @@ import { ConversaSlot } from "./ConversaSlot";
 import { ScoreSlot } from "./ScoreSlot";
 import { OwnerBadge } from "./OwnerBadge";
 import { ContatoNoCard } from "./ContatoNoCard";
+import { SeloDeComprador } from "./SeloDeComprador";
+import { produtosComprados } from "@/lib/leads/comprador";
 import { dataBr, dataDeRetomada } from "@/lib/leads/follow-up-futuro";
 import { ArquivosNoCard } from "./ArquivosNoCard";
 import { TarefasNoCard } from "./TarefasNoCard";
@@ -189,8 +191,11 @@ export function KanbanCard({
             "hover:border-border-strong",
             snapshot.isDragging && "rotate-1 shadow-md ring-1 ring-accent/40",
             isSelected && "ring-2 ring-accent",
+            // Comprador (fork ASK): borda âmbar grossa, visível de longe na coluna.
+            produtosComprados(lead).length > 0 && "border-2 border-amber-500 bg-amber-50",
           )}
         >
+          <SeloDeComprador lead={lead} />
           {/* key = contador: cada evento remoto monta um overlay NOVO, e é isso
               que reinicia a animação. Fica no elemento interno — pôr no wrapper
               remontaria o draggable e quebraria o arrasto. */}

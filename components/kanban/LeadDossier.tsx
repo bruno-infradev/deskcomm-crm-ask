@@ -23,6 +23,7 @@ import { OwnerBadge } from "./OwnerBadge";
 import { EtapaNoDossie } from "./EtapaNoDossie";
 import { SecaoDoDossie, useSecoesRecolhidas } from "./SecaoDoDossie";
 import { RespostasDoFormulario } from "./RespostasDoFormulario";
+import { SeloDeComprador } from "./SeloDeComprador";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
 import type { AtalhoDoCard } from "@/lib/leads/atalhos-do-card";
 import { formatValorDoNegocio, MOEDA_PADRAO } from "@/lib/money";
@@ -269,6 +270,8 @@ export function LeadDossier({
           contactId={lead.contact_id}
           phone={lead.contact_phone}
         />
+
+        <SeloDeComprador lead={lead} grande />
 
         <RespostasDoFormulario lead={lead} />
 
