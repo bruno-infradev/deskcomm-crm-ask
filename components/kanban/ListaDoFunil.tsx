@@ -113,6 +113,7 @@ export function ListaDoFunil({ pipelineId, pipeline: funil, stages, filtros = SE
       motivo: t("Motivo"),
       categoria: t("Categoria"),
       respostas: t("Respostas do formulário"),
+      sem_resposta: t("Sem resposta"),
     })[f];
 
   const leads = data?.leads ?? [];

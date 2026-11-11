@@ -1,4 +1,5 @@
 import type { Lead } from "@/lib/types/leads";
+import { estaSemResposta } from "@/lib/leads/sem-resposta";
 import {
   CHAVES_DE_RESPOSTA,
   passaNasRespostas,
@@ -74,6 +75,8 @@ export interface LeadFilters {
   lostCategory?: string;
   /** Respostas do popup (fork ASK): tem clínica, injetáveis, área e faturamento. OU dentro da pergunta, E entre perguntas. */
   respostas?: FiltroDeRespostas;
+  /** Fork ASK: só leads cuja última mensagem é do lead e ainda não teve resposta do vendedor. */
+  semResposta?: boolean;
 }
 
 /**
@@ -134,6 +137,7 @@ export function filtersFromParams(
     lostReason: sp.get("motivo") ?? undefined,
     lostCategory: sp.get("categoria") ?? undefined,
     ...respostasDosParams(sp),
+    semResposta: sp.get("sem_resposta") === "1" || undefined,
   };
 }
 
@@ -164,6 +168,7 @@ export function filtersToParams(f: LeadFilters): string {
   for (const chave of CHAVES_DE_RESPOSTA) {
     for (const valor of f.respostas?.[chave] ?? []) p.append(`r_${chave}`, valor);
   }
+  if (f.semResposta) p.set("sem_resposta", "1");
   return p.toString();
 }
 
@@ -246,6 +251,7 @@ export function applyFilters(
     // `passaMarcador`, lá em cima.
     if (!passaMarcador(l)) return false;
     if (!passaNasRespostas(l, f.respostas)) return false;
+    if (f.semResposta && !estaSemResposta(l)) return false;
     if (
       search &&
       !`${l.title} ${l.description ?? ""} ${l.contact_phone ?? ""}`.toLowerCase().includes(search) &&

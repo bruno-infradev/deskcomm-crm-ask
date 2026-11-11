@@ -434,6 +434,21 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
       <label
         className={cn(
           "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm",
+          filters.semResposta && "border-accent bg-accent/10",
+        )}
+      >
+        <input
+          type="checkbox"
+          data-testid="filtro-sem-resposta"
+          checked={!!filters.semResposta}
+          onChange={(e) => onChange({ ...filters, semResposta: e.target.checked || undefined })}
+        />
+        {t("Sem resposta")}
+      </label>
+
+      <label
+        className={cn(
+          "flex cursor-pointer select-none items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm",
           filters.overdueOnly && "border-accent bg-accent/10",
         )}
       >
@@ -452,6 +467,7 @@ export function FilterBar({ filters, onChange, leads, settings }: FilterBarProps
         filters.lostReason ||
         filters.lostCategory ||
         temRespostaFiltrada ||
+        filters.semResposta ||
         (filters.status && filters.status !== "all")) && (
         <Button
           variant="ghost"

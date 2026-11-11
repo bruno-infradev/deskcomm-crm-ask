@@ -97,6 +97,8 @@ export interface Lead {
     preview: string | null;
     last_message_at: string | null;
     unread: number;
+    /** Fork ASK: desde quando o lead espera resposta (mensagem do cliente mais antiga sem resposta); null = ninguém espera. */
+    awaiting_since?: string | null;
   } | null;
   score?: {
     probability: number;

@@ -283,7 +283,7 @@ async function withConversas(
   const { data, error } = await buscaEmLotes(contactIds, (lote) =>
     supabase
       .from("conversations")
-      .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, tags")
+      .select("id, contact_id, last_message_preview, last_message_at, unread_count_for_assignee, awaiting_since, tags")
       .eq("organization_id", organizationId)
       .in("contact_id", lote)
       .order("last_message_at", { ascending: false, nullsFirst: false }),
@@ -298,6 +298,7 @@ async function withConversas(
     last_message_preview: string | null;
     last_message_at: string | null;
     unread_count_for_assignee: number | null;
+    awaiting_since: string | null;
     tags: string[] | null;
   }>) {
     // Os marcadores somam TODAS as conversas; a linha do card é só a mais recente.
@@ -313,6 +314,7 @@ async function withConversas(
       preview: row.last_message_preview,
       last_message_at: row.last_message_at,
       unread: row.unread_count_for_assignee ?? 0,
+      awaiting_since: row.awaiting_since ?? null,
     });
   }
 

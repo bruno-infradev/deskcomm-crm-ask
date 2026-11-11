@@ -18,6 +18,7 @@ import { ContatoNoCard } from "./ContatoNoCard";
 import { SeloDeComprador } from "./SeloDeComprador";
 import { produtosComprados } from "@/lib/leads/comprador";
 import { dataBr, dataDeRetomada } from "@/lib/leads/follow-up-futuro";
+import { esperaDoLead, rotuloDeEspera } from "@/lib/leads/sem-resposta";
 import { ArquivosNoCard } from "./ArquivosNoCard";
 import { TarefasNoCard } from "./TarefasNoCard";
 
@@ -196,6 +197,13 @@ export function KanbanCard({
           )}
         >
           <SeloDeComprador lead={lead} />
+          {/* Sem resposta (fork ASK): o lead escreveu e ninguém respondeu. Aparece em todo card aberto que espera, para o
+              vendedor ver de relance há quanto tempo. */}
+          {esperaDoLead(lead) ? (
+            <p data-testid="card-sem-resposta" className="mb-1 text-xs font-semibold text-red-700">
+              {t("Sem resposta")} {rotuloDeEspera(esperaDoLead(lead) as string)}
+            </p>
+          ) : null}
           {/* key = contador: cada evento remoto monta um overlay NOVO, e é isso
               que reinicia a animação. Fica no elemento interno — pôr no wrapper
               remontaria o draggable e quebraria o arrasto. */}

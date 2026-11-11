@@ -11,6 +11,7 @@ import { useRenameStage } from "@/hooks/kanban/useRenameStage";
 import { CamposObrigatoriosDialog } from "./CamposObrigatoriosDialog";
 import { LoseLeadDialog } from "./LoseLeadDialog";
 import { RetomarEmDialog } from "./RetomarEmDialog";
+import { compararPorEspera } from "@/lib/leads/sem-resposta";
 import { ehEtapaFollowUpFuturo, CHAVE_RETOMAR_EM } from "@/lib/leads/follow-up-futuro";
 import { useAssignableMembers } from "@/hooks/inbox/useAssignableMembers";
 import { useAtRiskLeads } from "@/hooks/leads/useAtRiskLeads";
@@ -61,9 +62,11 @@ interface KanbanBoardProps {
    * É a razão de o funil arquivado ser abrível sem desarquivar.
    */
   somenteLeitura?: boolean;
+  /** Fork ASK: ordena cada coluna pelo tempo sem resposta (mais antigo primeiro). Ligado junto do filtro "Sem resposta". */
+  ordemPorEspera?: boolean;
 }
 
-function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> {
+function groupLeadsByStage(stages: Stage[], leads: Lead[], porEspera = false): Map<string, Lead[]> {
   const map = new Map<string, Lead[]>();
   for (const stage of stages) map.set(stage.id, []);
   for (const lead of leads) {
@@ -75,7 +78,8 @@ function groupLeadsByStage(stages: Stage[], leads: Lead[]): Map<string, Lead[]> 
   // sem o desempate, dois cards empatados trocavam de lugar a cada render
   // (#3461).
   for (const list of map.values()) {
-    list.sort(compararNaEtapa);
+    // Fork ASK: com o filtro "Sem resposta" ligado, quem espera há mais tempo vem primeiro.
+    list.sort(porEspera ? (a, b) => compararPorEspera(a, b) || compararNaEtapa(a, b) : compararNaEtapa);
   }
   return map;
 }
@@ -110,6 +114,7 @@ export function KanbanBoard({
   podeRenomearEtapa = false,
   denso = false,
   somenteLeitura = false,
+  ordemPorEspera = false,
 }: KanbanBoardProps) {
   const t = useT();
   const useExternal = stagesProp !== undefined && leadsProp !== undefined;
@@ -200,8 +205,8 @@ export function KanbanBoard({
 
   const grouped = useMemo(() => {
     if (!data) return null;
-    return groupLeadsByStage(data.stages, data.leads);
-  }, [data]);
+    return groupLeadsByStage(data.stages, data.leads, ordemPorEspera);
+  }, [data, ordemPorEspera]);
 
   // Um conjunto por vez, e não um card por vez: o board recebe o resultado do
   // gesto já resolvido pela coluna (um card, um intervalo, a etapa inteira). A
