@@ -36,7 +36,7 @@ export const primeiraMensagemMoveHandler: EventHandler = {
 
     const { data: leads, error } = await admin
       .from("crm_leads")
-      .select("id, pipeline_id, stage_id, crm_stages!inner(name)")
+      .select("id, pipeline_id, stage_id, crm_stages!crm_leads_stage_id_fkey!inner(name)")
       .eq("organization_id", row.organization_id)
       .eq("contact_id", conversa.contact_id)
       .eq("status", "open");
