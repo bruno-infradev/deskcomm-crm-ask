@@ -59,7 +59,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /** O atendente tem número próprio, mas esta conversa está no de outra pessoa. */
 export const CODIGO_NUMERO_DE_OUTRO = "conversa_em_numero_de_outro_atendente" as const;
 
-export type CodigoDoNumero = typeof CODIGO_NUMERO_DE_OUTRO;
+/**
+ * O vendedor (papel `agent`) não tem NENHUM número conectado e tentou responder
+ * pelo número de outro (12/11/2026, Bruno: o João Paulo estava com os números
+ * desconectados, não viu, e mandou 30 "Bom dia" pelo número do Ângelo).
+ */
+export const CODIGO_SEU_WHATSAPP_DESCONECTADO = "seu_whatsapp_desconectado" as const;
+
+export type CodigoDoNumero = typeof CODIGO_NUMERO_DE_OUTRO | typeof CODIGO_SEU_WHATSAPP_DESCONECTADO;
 
 /** O que a decisão precisa saber — já lido, sem banco. */
 export interface QuadroDoNumero {
@@ -89,10 +96,18 @@ const SEM_REGRA_DE_NUMERO: QuadroDoNumero = {
  * número que os dois usam) é o caso legítimo e não pode virar recusa. Quem não
  * tem número próprio responde (doc 237, 1-B).
  */
-export function vereditoDoNumero(quadro: QuadroDoNumero): VereditoDoNumero {
+export function vereditoDoNumero(
+  quadro: QuadroDoNumero,
+  opcoes: { vendedor?: boolean } = {},
+): VereditoDoNumero {
   if (!quadro.roteamentoPorVendedor) return { ok: true };
   if (quadro.atendenteRespondePelaSessao) return { ok: true };
-  if (!quadro.atendenteTemNumero) return { ok: true };
+  if (!quadro.atendenteTemNumero) {
+    // Gerente e admin sem número próprio seguem como sempre (doc 237, 1-B). O
+    // VENDEDOR (papel `agent`) nunca fala pelo número de outro, nem com o dele
+    // desconectado: o aviso manda reconectar em vez de cair no número do colega.
+    return opcoes.vendedor ? { ok: false, codigo: CODIGO_SEU_WHATSAPP_DESCONECTADO } : { ok: true };
+  }
   return { ok: false, codigo: CODIGO_NUMERO_DE_OUTRO };
 }
 
@@ -212,6 +227,8 @@ export async function quadroDoNumero(
 export const MENSAGEM_DO_NUMERO: Record<CodigoDoNumero, string> = {
   [CODIGO_NUMERO_DE_OUTRO]:
     "Esta conversa está no número de outro atendente, e você tem número próprio. Responda ao cliente pela conversa do seu número, ou peça que esta seja transferida para você.",
+  [CODIGO_SEU_WHATSAPP_DESCONECTADO]:
+    "Seu WhatsApp está desconectado, reconecte em Conexões. Não é possível enviar pelo número de outro atendente. Nada foi enviado.",
 };
 
 /**

@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 import {
   avisoDaContinua,
   CODIGO_NUMERO_DE_OUTRO,
+  CODIGO_SEU_WHATSAPP_DESCONECTADO,
   MENSAGEM_DO_NUMERO,
   modeloDaContinua,
   quadroDoNumero,
@@ -142,6 +143,24 @@ describe("#3642 — a decisão: quem responde por este número pode enviar?", ()
         atendenteRespondePelaSessao: false,
         atendenteTemNumero: false,
       }),
+    ).toEqual({ ok: true });
+  });
+
+  it("vendedor (agent) com o próprio número desconectado NÃO cai no número do colega (12/11)", () => {
+    expect(
+      vereditoDoNumero(
+        { roteamentoPorVendedor: true, atendenteRespondePelaSessao: false, atendenteTemNumero: false },
+        { vendedor: true },
+      ),
+    ).toEqual({ ok: false, codigo: CODIGO_SEU_WHATSAPP_DESCONECTADO });
+  });
+
+  it("vendedor envia pelo próprio número, mesmo com roteamento por vendedor", () => {
+    expect(
+      vereditoDoNumero(
+        { roteamentoPorVendedor: true, atendenteRespondePelaSessao: true, atendenteTemNumero: true },
+        { vendedor: true },
+      ),
     ).toEqual({ ok: true });
   });
 

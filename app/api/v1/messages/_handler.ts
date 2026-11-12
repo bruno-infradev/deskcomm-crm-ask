@@ -613,7 +613,7 @@ export async function sendMessageHandler(
         ),
       );
     }
-    const veredito = vereditoDoNumero(numero.quadro);
+    const veredito = vereditoDoNumero(numero.quadro, { vendedor: ctx.actor.role === "agent" });
     if (!veredito.ok) {
       // #3732: a recusa diz PARA ONDE IR. No caso que a issue mediu a conversa
       // já é de quem está tentando responder — ela não pôde seguir o vendedor

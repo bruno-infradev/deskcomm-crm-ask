@@ -230,7 +230,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       supabase,
       {
         organization_id: organizationId,
-        actor,
+        // O papel entra só para a guarda do número (vendedor não fala pelo número de outro).
+        actor: actor.type === "user" && authz.papel ? { ...actor, role: authz.papel } : actor,
         requestId,
         idioma,
         // Só chega aqui com o escopo e o membership já validados acima; o

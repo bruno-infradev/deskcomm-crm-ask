@@ -65,6 +65,8 @@ export type AuthDual =
       scopes?: string[];
       /** Id da linha do token (`api_tokens.id`) — o `actor_api_token_id` do audit. */
       apiTokenId?: string;
+      /** Papel efetivo de quem entrou pela tela (`fn_user_role_in_org`); ausente no token. */
+      papel?: string;
     }
   | { ok: false; response: Response };
 
@@ -148,6 +150,7 @@ export async function resolveAuthDual(
     supabase: await createClient(),
     idioma: authz.user.idioma,
     via: "session",
+    papel: authz.org.role,
   };
 }
 
