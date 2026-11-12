@@ -26,6 +26,7 @@ import {
   type LeadParaOrigem,
   type VendaDoDia,
 } from "@/lib/metrics/resultado-comercial";
+import { abordagensNovasDoDia, estatisticaDeCadencia } from "@/lib/channels/cadencia-abordagem";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -203,6 +204,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         venda_reais: contatosGanhos.get(l.contact_id as string) ?? null,
       }));
 
+  // Cadência das abordagens novas por número (T-20261112-003): só leitura, para a análise do fim do dia.
+  const agoraCad = new Date();
+  const novasPorSessao = new Map<string, Date[]>();
+  for (const id of idsSessoes) {
+    const r = await abordagensNovasDoDia(admin, { organizationId: orgId, channelSessionId: id, agora: agoraCad, dia });
+    novasPorSessao.set(id, r.leitura === "ok" ? r.instantes : []);
+  }
+
   const doVendedorIds = (userId: string) => sessoesDosVendedores.filter((s) => donoDaSessao.get(s.id as string) === userId).map((s) => s.id as string);
   const vendedores = idsVendedores.map((userId) => {
     const doVendedor = sessoesDosVendedores.filter((s) => donoDaSessao.get(s.id as string) === userId);
@@ -236,6 +245,7 @@ export async function GET(req: NextRequest): Promise<Response> {
         ? new Date(horaDaMeta).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })
         : null,
       por_hora: abordagemPorHora(linhas.filter((l) => idsDele.has(l.channel_session_id))),
+      cadencia: estatisticaDeCadencia(doVendedor.flatMap((s) => novasPorSessao.get(s.id as string) ?? []), agoraCad),
       numeros: doVendedor.map((s) => {
         const saidaDoNumero = saida.filter((l) => l.channel_session_id === s.id);
         return {
@@ -244,6 +254,7 @@ export async function GET(req: NextRequest): Promise<Response> {
           final: String(s.phone_number ?? "").replace(/\D/g, "").slice(-4),
           abordados: new Set(saidaDoNumero.map((l) => l.contact_id as string)).size,
           mensagens_enviadas: saidaDoNumero.length,
+          cadencia: estatisticaDeCadencia(novasPorSessao.get(s.id as string) ?? [], agoraCad),
         };
       }),
     };

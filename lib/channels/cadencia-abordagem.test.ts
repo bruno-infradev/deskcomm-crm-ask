@@ -1,51 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { decidirCadencia, esperaLegivel, INTERVALO_MINIMO_MS, MAXIMO_POR_HORA, mensagemDaCadencia } from "./cadencia-abordagem";
+import { estatisticaDeCadencia } from "./cadencia-abordagem";
 
 const AGORA = new Date("2026-11-12T12:00:00.000Z");
 const minAtras = (m: number) => new Date(AGORA.getTime() - m * 60000);
 
-describe("decidirCadencia", () => {
-  it("a primeira abordagem do dia sai", () => {
-    expect(decidirCadencia([], AGORA)).toEqual({ liberado: true, feitasHoje: 0, esperaMs: 0 });
+describe("estatisticaDeCadencia", () => {
+  it("dia sem abordagem nova", () => {
+    expect(estatisticaDeCadencia([], AGORA)).toEqual({ total: 0, maximo_em_uma_hora: 0, menor_intervalo_min: null, menos_de_5_min: 0, ultima_ha_min: null });
   });
 
-  it("a segunda logo depois da primeira é barrada pelo intervalo", () => {
-    const d = decidirCadencia([minAtras(1)], AGORA);
-    expect(d.liberado).toBe(false);
-    if (!d.liberado) {
-      expect(d.motivo).toBe("intervalo");
-      expect(d.esperaMs).toBe(INTERVALO_MINIMO_MS - 60000);
-      expect(esperaLegivel(d.esperaMs)).toBe("9 min");
-    }
+  it("o caso de 12/11: 30 abordagens em 34 min, uma por minuto", () => {
+    const rajada = Array.from({ length: 30 }, (_, i) => minAtras(40 - i));
+    const e = estatisticaDeCadencia(rajada, AGORA);
+    expect(e.total).toBe(30);
+    expect(e.maximo_em_uma_hora).toBe(30);
+    expect(e.menor_intervalo_min).toBe(1);
+    expect(e.menos_de_5_min).toBe(29);
+    expect(e.ultima_ha_min).toBe(11);
   });
 
-  it("passados 10 minutos a próxima sai", () => {
-    expect(decidirCadencia([minAtras(10)], AGORA).liberado).toBe(true);
-  });
-
-  it("o caso do dia 12/11: 30 em 34 minutos teria parado na segunda", () => {
-    const rajada = Array.from({ length: 30 }, (_, i) => minAtras(34 - i));
-    const d = decidirCadencia(rajada.slice(0, 2), minAtras(32));
-    expect(d.liberado).toBe(false);
-  });
-
-  it("6 na última hora (feitas pelo celular) trava até a mais antiga sair da janela", () => {
-    const seis = Array.from({ length: MAXIMO_POR_HORA }, (_, i) => minAtras(55 - i));
-    const d = decidirCadencia([...seis, minAtras(300)], AGORA);
-    expect(d.liberado).toBe(false);
-    if (!d.liberado) {
-      expect(d.motivo).toBe("limite_por_hora");
-      expect(d.esperaMs).toBe(5 * 60000);
-    }
-  });
-
-  it("a frase diz quanto falta, quantas já foram e que nada saiu", () => {
-    const d = decidirCadencia([minAtras(3)], AGORA);
-    if (d.liberado) throw new Error("esperava barrar");
-    const frase = mensagemDaCadencia(d);
-    expect(frase).toMatch(/liberada em 7 min/);
-    expect(frase).toMatch(/1\/30 hoje/);
-    expect(frase).toMatch(/Nada foi enviado/);
+  it("abordagem espaçada de 10 em 10 minutos tem no máximo 6 por hora e nenhuma rápida", () => {
+    const espacadas = Array.from({ length: 10 }, (_, i) => minAtras(100 - i * 10));
+    const e = estatisticaDeCadencia(espacadas, AGORA);
+    expect(e.maximo_em_uma_hora).toBe(6);
+    expect(e.menos_de_5_min).toBe(0);
+    expect(e.menor_intervalo_min).toBe(10);
   });
 });

@@ -1,15 +1,15 @@
 /**
  * GET /api/v1/conversations/[id]/cadencia — contador das abordagens novas do número desta conversa (T-20261112-003).
  *
- * Só faz sentido para vendedor (papel `agent`): para os demais devolve `aplica: false` e a tela não mostra nada.
- * Reflete a MESMA decisão que o envio aplica (`lib/channels/cadencia-abordagem.ts`).
+ * Só informação para o vendedor (papel `agent`): para os demais devolve `aplica: false`. O envio NÃO é barrado por cadência
+ * (Bruno, 12/11 10h33: os vendedores espaçam à mão e o fim do dia é analisado).
  */
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
 import { resolveAuthDual } from "@/lib/api/auth-dual";
 import { ok, fail } from "@/lib/api/wrappers";
-import { abordagensNovasDoDia, decidirCadencia, META_DO_DIA } from "@/lib/channels/cadencia-abordagem";
+import { abordagensNovasDoDia, estatisticaDeCadencia, INTERVALO_MINIMO_MS, META_DO_DIA } from "@/lib/channels/cadencia-abordagem";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -35,19 +35,18 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
 
   const admin = createAdminClient();
   const agora = new Date();
-  const [doDia, { count }] = await Promise.all([
-    abordagensNovasDoDia(admin, { organizationId: authz.organizationId, channelSessionId: conversa.channel_session_id as string, agora }),
-    admin.from("messages").select("id", { count: "exact", head: true }).eq("organization_id", authz.organizationId).eq("conversation_id", id),
-  ]);
+  const doDia = await abordagensNovasDoDia(admin, { organizationId: authz.organizationId, channelSessionId: conversa.channel_session_id as string, agora });
   if (doDia.leitura === "indisponivel") return fail("internal_error", "Cadência indisponível.", 503, { requestId });
-  const decisao = decidirCadencia(doDia.instantes, agora);
+  const est = estatisticaDeCadencia(doDia.instantes, agora);
   return ok(
     {
       aplica: true,
       meta: META_DO_DIA,
-      feitas_hoje: decisao.feitasHoje,
-      espera_s: Math.ceil(decisao.esperaMs / 1000),
-      conversa_nova: (count ?? 0) === 0,
+      intervalo_recomendado_min: INTERVALO_MINIMO_MS / 60000,
+      feitas_hoje: est.total,
+      ultima_ha_min: est.ultima_ha_min,
+      // Só informação: o envio nunca é barrado por cadência (Bruno, 12/11 10h33).
+      espere: est.ultima_ha_min !== null && est.ultima_ha_min < INTERVALO_MINIMO_MS / 60000,
     },
     { requestId },
   );
