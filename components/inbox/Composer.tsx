@@ -32,6 +32,8 @@ import { useCreateNote } from "@/hooks/inbox/useCreateNote";
 import { useGruposDeRespostas, useMessageTemplates } from "@/hooks/inbox/useMessageTemplates";
 import { X } from "lucide-react";
 import { toast } from "sonner";
+
+import { CadenciaDaAbordagem } from "@/components/inbox/CadenciaDaAbordagem";
 import { useSendMessage } from "@/hooks/inbox/useSendMessage";
 import { useUploadMedia, type DestinoDoUpload } from "@/hooks/inbox/useUploadMedia";
 import { useRascunhoAssistido } from "@/hooks/inbox/useRascunhoAssistido";
@@ -980,6 +982,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
           mode === "note" && "border-warning/40 bg-warning-bg",
         )}
       >
+        <CadenciaDaAbordagem conversationId={conversationId} />
         {/* O REALCE DO ARRASTE (#3708) — a única coisa que o operador vê antes
             de soltar o arquivo. Sem ele, o gesto não tem confirmação nenhuma:
             solta, a prévia abre, mas ninguém sabia que aquele espaço aceitava

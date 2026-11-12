@@ -193,14 +193,10 @@ export async function POST(
     // `device_removed`) não volta com stop + start: o start devolve FAILED e o QR nunca sai, e o vendedor, que
     // não é admin, não tem o modo forçado. Nesse estado a credencial já está morta, então descartá-la (logout) não
     // perde nada e é o único caminho para o QR aparecer.
-    let sessaoPresa = false;
-    if (!force && (session.status === "FAILED" || session.status === "STOPPED")) {
-      try {
-        sessaoPresa = (await waha.getSessionQr(nomeParaOTransporte)).status === "FAILED";
-      } catch {
-        sessaoPresa = false;
-      }
-    }
+    // 12/11/2026: a checagem anterior perguntava ao WAHA se a sessão estava FAILED DEPOIS do stop, quando o
+    // estado já é STOPPED, então nunca disparava e o logout não acontecia (o QR do João Paulo não abria).
+    // O estado que o CRM conhece, FAILED ou STOPPED, já basta: a credencial está morta e o vendedor vai reescanear.
+    const sessaoPresa = !force && (session.status === "FAILED" || session.status === "STOPPED");
     // Modo forçado (admin): descartar a credencial é irreversível — obriga a reescanear o QR mesmo que ela
     // ainda estivesse boa.
     if (force || sessaoPresa) await waha.logoutSession(nomeParaOTransporte);

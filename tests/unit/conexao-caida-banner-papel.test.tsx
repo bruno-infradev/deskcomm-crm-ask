@@ -47,7 +47,6 @@ describe.each(["pt-BR", "es"] as const)("alerta de conexão em %s", locale => {
   });
 
   it.each([
-    ["atendente", "agent", baseUser],
     ["gerente", "manager", baseUser],
     ["viewer", "viewer", baseUser],
     ["plataforma em suporte somente leitura com vínculo físico admin", "viewer", { ...baseUser, is_platform_admin: true, support }],
@@ -58,6 +57,13 @@ describe.each(["pt-BR", "es"] as const)("alerta de conexão em %s", locale => {
     expect(alert).toHaveTextContent(copy[locale].outage);
     expect(within(alert).queryByRole("link")).toBeNull();
     expect(within(alert).getByText(copy[locale].help)).toBeVisible();
+  });
+
+  it("vendedor (agent) vê o aviso próprio e o atalho para Meus números, nunca Conexões", () => {
+    render(view("agent", locale));
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByTestId("aviso-do-vendedor")).toHaveTextContent("Seu WhatsApp está desconectado");
+    expect(within(alert).getByRole("link", { name: "Reconectar" })).toHaveAttribute("href", "/app/meus-numeros");
   });
 
   it("retira o alerta quando não há conexão caída", () => {

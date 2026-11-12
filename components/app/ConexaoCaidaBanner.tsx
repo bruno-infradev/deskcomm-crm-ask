@@ -47,6 +47,7 @@ export function ConexaoCaidaBanner({ caidas }: { caidas: ConexaoCaida[] }) {
 
   const podeAbrirConexoes = (user.is_platform_admin && !user.support)
     || (activeOrg !== null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.admin);
+  const ehVendedor = activeOrg?.role === "agent" && !user.is_platform_admin;
   const uma = caidas.length === 1 ? caidas[0] : null;
   const precisaEscanear = caidas.some((c) => c.status === "SCAN_QR_CODE");
 
@@ -58,6 +59,12 @@ export function ConexaoCaidaBanner({ caidas }: { caidas: ConexaoCaida[] }) {
     >
       <div className="flex items-center gap-2">
         <span aria-hidden>🔌</span>
+        {ehVendedor ? (
+          <span data-testid="aviso-do-vendedor">
+            <strong className="font-semibold">{t("Seu WhatsApp está desconectado")}</strong>
+            {`. ${t("Reconecte em Meus números para voltar a enviar mensagens: enquanto isso você não consegue enviar, nem pelo número de outro atendente.")}`}
+          </span>
+        ) : (
         <span>
           {uma ? (
             <>
@@ -74,12 +81,13 @@ export function ConexaoCaidaBanner({ caidas }: { caidas: ConexaoCaida[] }) {
           )}
           {` — ${t("nenhuma mensagem entra nem sai.")}`}
         </span>
+        )}
       </div>
-      {podeAbrirConexoes ? <Link
-        href="/app/connections"
+      {podeAbrirConexoes || ehVendedor ? <Link
+        href={ehVendedor ? "/app/meus-numeros" : "/app/connections"}
         className="rounded-md border border-red-400 bg-white/70 px-3 py-1 font-medium max-md:inline-flex max-md:min-h-11 max-md:items-center text-red-950 hover:bg-white dark:border-red-700 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/70"
       >
-        {precisaEscanear ? t("Escanear o QR") : t("Ver conexões")}
+        {ehVendedor ? t("Reconectar") : precisaEscanear ? t("Escanear o QR") : t("Ver conexões")}
       </Link> : <span>{t("Peça a quem administra para revisar a conexão do WhatsApp.")}</span>}
     </div>
   );

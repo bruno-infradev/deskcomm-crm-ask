@@ -67,6 +67,12 @@ import {
   quadroDoNumero,
   vereditoDoNumero,
 } from "@/lib/channels/numero-do-atendente";
+import {
+  abordagensNovasDoDia,
+  CODIGO_ABORDAGEM_CADENCIADA,
+  decidirCadencia,
+  mensagemDaCadencia,
+} from "@/lib/channels/cadencia-abordagem";
 import { emitirFalhaDeEntrega } from "@/lib/messaging/falha-de-entrega";
 import { previaDaMensagem } from "@/lib/messaging/previa-da-mensagem";
 import { pedirReenvioDoDesacelerado, reenvioDesaceleradoAtende } from "@/lib/messaging/reenvio-desacelerado";
@@ -653,6 +659,57 @@ export async function sendMessageHandler(
         ctx.requestId,
         mensagem,
       );
+    }
+  }
+
+  // ─── Cadência das abordagens novas (T-20261112-003) ───────────────────────
+  //
+  // Vendedor (papel `agent`) não escreve primeiro a contato frio em rajada: em
+  // 12/11 o Ângelo · 1 mandou 30 "Bom dia" em 34 min e o WhatsApp bloqueou o
+  // número por 24 h. A abordagem NOVA é a primeira mensagem de uma conversa sem
+  // nenhuma mensagem; resposta a quem já escreveu não passa por aqui. A recusa é
+  // alta (nada é gravado nem sai por outro número) e diz quando libera.
+  if (ctx.actor.type === "user" && ctx.actor.role === "agent" && !c.is_group && c.channel_session_id) {
+    const { count: mensagensDaConversa, error: erroDaConversa } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", ctx.organization_id)
+      .eq("conversation_id", input.conversation_id);
+    if (erroDaConversa) {
+      throw new ApiError(
+        503,
+        "cadencia_indisponivel",
+        undefined,
+        ctx.requestId,
+        traduzir("Não foi possível conferir a cadência das abordagens. Nada foi enviado.", ctx.idioma ?? "pt-BR"),
+      );
+    }
+    if ((mensagensDaConversa ?? 0) === 0) {
+      const agora = new Date();
+      const doDia = await abordagensNovasDoDia(isServiceRoleConfigured() ? createAdminClient() : supabase, {
+        organizationId: ctx.organization_id,
+        channelSessionId: c.channel_session_id,
+        agora,
+      });
+      if (doDia.leitura === "indisponivel") {
+        throw new ApiError(
+          503,
+          "cadencia_indisponivel",
+          undefined,
+          ctx.requestId,
+          traduzir("Não foi possível conferir a cadência das abordagens. Nada foi enviado.", ctx.idioma ?? "pt-BR"),
+        );
+      }
+      const decisao = decidirCadencia(doDia.instantes, agora);
+      if (!decisao.liberado) {
+        throw new ApiError(
+          409,
+          CODIGO_ABORDAGEM_CADENCIADA,
+          { channel_session_id: c.channel_session_id, espera_s: Math.ceil(decisao.esperaMs / 1000), feitas_hoje: decisao.feitasHoje },
+          ctx.requestId,
+          traduzir(mensagemDaCadencia(decisao), ctx.idioma ?? "pt-BR"),
+        );
+      }
     }
   }
 
