@@ -22,6 +22,7 @@ import { TarefasDoNegocio } from "./TarefasDoNegocio";
 import { OwnerBadge } from "./OwnerBadge";
 import { EtapaNoDossie } from "./EtapaNoDossie";
 import { SecaoDoDossie, useSecoesRecolhidas } from "./SecaoDoDossie";
+import { OrigemDoLead } from "./OrigemDoLead";
 import { RespostasDoFormulario } from "./RespostasDoFormulario";
 import { SeloDeComprador } from "./SeloDeComprador";
 import { resolveLeadOwner } from "@/lib/kanban/owner";
@@ -272,6 +273,8 @@ export function LeadDossier({
         />
 
         <SeloDeComprador lead={lead} grande />
+
+        <OrigemDoLead lead={lead} />
 
         <RespostasDoFormulario lead={lead} />
 
