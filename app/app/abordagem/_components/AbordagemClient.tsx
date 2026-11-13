@@ -39,10 +39,19 @@ interface OrigemAbordagem {
   vendas: number;
   valor_reais: number;
 }
+interface ConversaoEtapas {
+  comparecimento: number | null;
+  reuniao_para_proposta: number | null;
+  proposta_para_venda: number | null;
+  fechamento: number | null;
+}
 interface Resultado {
   reunioes_marcadas: number;
+  reunioes_nao_compareceram: number;
   reunioes_feitas: number;
   propostas: number;
+  perdidos: number;
+  conversao: ConversaoEtapas | null;
   vendas: ResumoVendas;
   resposta_do_vendedor: RespostaDoVendedor;
   por_origem: OrigemAbordagem[];
@@ -74,15 +83,18 @@ const taxaDeResposta = (responderam: number, abordados: number): string => (abor
 
 const reais = (n: number): string => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const MINUTOS_POR_HORA = 60;
+const pct = (n: number | null | undefined): string => (n === null || n === undefined ? "–" : `${n}%`);
 const tempo = (min: number | null): string => (min === null ? "–" : min < MINUTOS_POR_HORA ? `${min} min` : `${Math.floor(min / MINUTOS_POR_HORA)} h ${min % MINUTOS_POR_HORA} min`);
 
 function LinhasDeResultado({ r }: { r: Resultado }) {
   return (
     <dl className="grid grid-cols-2 gap-2 border-t pt-3 text-sm">
       <div><dt className="text-muted-foreground">Reuniões marcadas</dt><dd className="tabular-nums" data-testid="reunioes-marcadas">{r.reunioes_marcadas}</dd></div>
-      <div><dt className="text-muted-foreground">Reuniões feitas</dt><dd className="tabular-nums">{r.reunioes_feitas}</dd></div>
-      <div><dt className="text-muted-foreground">Propostas</dt><dd className="tabular-nums">{r.propostas}</dd></div>
-      <div><dt className="text-muted-foreground">Vendas</dt><dd className="tabular-nums" data-testid="vendas">{r.vendas.qtd} <span className="text-muted-foreground">({reais(r.vendas.valor_reais)})</span></dd></div>
+      <div><dt className="text-muted-foreground">Compareceram (reunião feita)</dt><dd className="tabular-nums" data-testid="reunioes-feitas">{r.reunioes_feitas} <span className="text-muted-foreground">({pct(r.conversao?.comparecimento)})</span></dd></div>
+      <div><dt className="text-muted-foreground">Não compareceram</dt><dd className="tabular-nums" data-testid="reunioes-nao-compareceram">{r.reunioes_nao_compareceram}</dd></div>
+      <div><dt className="text-muted-foreground">Propostas</dt><dd className="tabular-nums">{r.propostas} <span className="text-muted-foreground">({pct(r.conversao?.reuniao_para_proposta)} das reuniões)</span></dd></div>
+      <div><dt className="text-muted-foreground">Fecharam (vendas)</dt><dd className="tabular-nums" data-testid="vendas">{r.vendas.qtd} <span className="text-muted-foreground">({reais(r.vendas.valor_reais)}; {pct(r.conversao?.proposta_para_venda)} das propostas)</span></dd></div>
+      <div><dt className="text-muted-foreground">Não fecharam (perdidos)</dt><dd className="tabular-nums" data-testid="perdidos">{r.perdidos} <span className="text-muted-foreground">(fechamento {pct(r.conversao?.fechamento)})</span></dd></div>
       <div><dt className="text-muted-foreground">Tempo até responder</dt><dd className="tabular-nums">{tempo(r.resposta_do_vendedor.media_minutos)}</dd></div>
       <div><dt className="text-muted-foreground">Sem resposta agora</dt><dd className="tabular-nums">{r.resposta_do_vendedor.sem_resposta}</dd></div>
     </dl>

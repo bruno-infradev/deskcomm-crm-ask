@@ -50,7 +50,23 @@ interface LinhaMensagem {
 
 const CENTAVOS_POR_REAL = 100;
 const LOTE_CONTATOS = 200;
-const ETAPAS_DE_RESULTADO = ["reuniao_marcada", "reuniao_feita", "proposta_enviada"] as const;
+const ETAPAS_DE_RESULTADO = ["reuniao_marcada", "reuniao_nao_compareceu", "reuniao_feita", "proposta_enviada"] as const;
+
+// Percentual inteiro entre duas contagens; sem base (denominador 0) devolve null para a tela mostrar traço.
+const taxa = (parte: number, base: number): number | null => (base > 0 ? Math.round((parte / base) * 100) : null);
+
+interface ConversaoEtapas {
+  comparecimento: number | null; // reunião feita / (feita + não compareceu)
+  reuniao_para_proposta: number | null; // proposta / reunião feita
+  proposta_para_venda: number | null; // vendas / proposta
+  fechamento: number | null; // vendas / (vendas + perdidos)
+}
+const conversaoDeEtapas = (c: { feitas: number; naoCompareceram: number; propostas: number; vendas: number; perdidos: number }): ConversaoEtapas => ({
+  comparecimento: taxa(c.feitas, c.feitas + c.naoCompareceram),
+  reuniao_para_proposta: taxa(c.propostas, c.feitas),
+  proposta_para_venda: taxa(c.vendas, c.propostas),
+  fechamento: taxa(c.vendas, c.vendas + c.perdidos),
+});
 
 interface LeadDoDia {
   owner_user_id: string | null;
@@ -150,7 +166,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const inicioIso = inicio.toISOString();
   const fimIso = fim.toISOString();
-  const [{ data: ganhosBrutos, error: e3 }, { data: etapasBrutas, error: e4 }] = await Promise.all([
+  const [{ data: ganhosBrutos, error: e3 }, { data: etapasBrutas, error: e4 }, { data: perdidosBrutos, error: e5 }] = await Promise.all([
     admin
       .from("crm_leads")
       .select("owner_user_id, contact_id, tags, value_cents, custom_fields")
@@ -167,8 +183,17 @@ export async function GET(req: NextRequest): Promise<Response> {
       .gte("stage_changed_at", inicioIso)
       .lt("stage_changed_at", fimIso)
       .in("owner_user_id", idsVendedores),
+    admin
+      .from("crm_leads")
+      .select("owner_user_id")
+      .eq("organization_id", orgId)
+      .eq("status", "lost")
+      .gte("closed_at", inicioIso)
+      .lt("closed_at", fimIso)
+      .in("owner_user_id", idsVendedores),
   ]);
-  if (e3 || e4) return fail("internal_error", (e3 ?? e4)!.message, 500, { requestId });
+  if (e3 || e4 || e5) return fail("internal_error", (e3 ?? e4 ?? e5)!.message, 500, { requestId });
+  const perdidos = (perdidosBrutos ?? []) as unknown as { owner_user_id: string | null }[];
   const ganhos = (ganhosBrutos ?? []) as unknown as LeadDoDia[];
   const etapas = (etapasBrutas ?? []) as unknown as LeadEtapa[];
   const slugDe = (l: LeadEtapa) => (Array.isArray(l.crm_stages) ? l.crm_stages[0]?.slug : l.crm_stages?.slug);
@@ -232,8 +257,10 @@ export async function GET(req: NextRequest): Promise<Response> {
       user_id: userId,
       nome: nomes.get(userId) ?? "Sem nome",
       reunioes_marcadas: contarEtapa("reuniao_marcada"),
+      reunioes_nao_compareceram: contarEtapa("reuniao_nao_compareceu"),
       reunioes_feitas: contarEtapa("reuniao_feita"),
       propostas: contarEtapa("proposta_enviada"),
+      perdidos: perdidos.filter((l) => l.owner_user_id === userId).length,
       vendas: resumirVendas(vendasDele),
       resposta_do_vendedor: tempoDeResposta(mensagensDele),
       por_origem: conversaoPorOrigem(origemDe(abordados, entrada)),
@@ -259,20 +286,29 @@ export async function GET(req: NextRequest): Promise<Response> {
       }),
     };
   });
-  vendedores.sort((a, b) => b.abordados - a.abordados);
+  const comConversao = vendedores.map((v) => ({
+    ...v,
+    conversao: conversaoDeEtapas({ feitas: v.reunioes_feitas, naoCompareceram: v.reunioes_nao_compareceram, propostas: v.propostas, vendas: v.vendas.qtd, perdidos: v.perdidos }),
+  }));
+  comConversao.sort((a, b) => b.abordados - a.abordados);
 
-  const idsDoTime = new Set(vendedores.flatMap((v) => doVendedorIds(v.user_id)));
+  const idsDoTime = new Set(comConversao.flatMap((v) => doVendedorIds(v.user_id)));
   const entradaDoTime = new Set(linhas.filter((l) => idsDoTime.has(l.channel_session_id) && l.direction === "inbound" && l.contact_id).map((l) => l.contact_id as string));
   const time = {
     abordados: vendedores.reduce((s, v) => s + v.abordados, 0),
     responderam: vendedores.reduce((s, v) => s + v.responderam, 0),
     reunioes_marcadas: vendedores.reduce((s, v) => s + v.reunioes_marcadas, 0),
+    reunioes_nao_compareceram: vendedores.reduce((s, v) => s + v.reunioes_nao_compareceram, 0),
     reunioes_feitas: vendedores.reduce((s, v) => s + v.reunioes_feitas, 0),
     propostas: vendedores.reduce((s, v) => s + v.propostas, 0),
+    perdidos: vendedores.reduce((s, v) => s + v.perdidos, 0),
     vendas: resumirVendas(ganhos.map(vendaDe)),
+    conversao: null as ConversaoEtapas | null,
     resposta_do_vendedor: tempoDeResposta(linhas.filter((l) => idsDoTime.has(l.channel_session_id))),
     por_origem: conversaoPorOrigem(origemDe(new Set(contatosAbordados), entradaDoTime)),
   };
 
-  return ok({ dia, meta, vendedores, time }, { requestId });
+  time.conversao = conversaoDeEtapas({ feitas: time.reunioes_feitas, naoCompareceram: time.reunioes_nao_compareceram, propostas: time.propostas, vendas: time.vendas.qtd, perdidos: time.perdidos });
+
+  return ok({ dia, meta, vendedores: comConversao, time }, { requestId });
 }
