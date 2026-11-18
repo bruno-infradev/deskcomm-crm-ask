@@ -109,6 +109,8 @@ export const PUBLIC_PATHS: RegExp[] = [
   /^\/api\/v1\/contacts$/,
   // GET /api/v1/metrics/abordagem aceita sessão OU Bearer do OS (leitura das contagens do dia; auth dentro da rota).
   /^\/api\/v1\/metrics\/abordagem$/,
+  // Mesma dualidade (sessão OU Bearer do OS, auth dentro da rota) nas leituras de horários, origem, atendimento e conexões (18/11/2026).
+  /^\/api\/v1\/metrics\/(horarios|origem|atendimento|conexoes)$/,
   // FOTO DO CONTATO SERVER-TO-SERVER (issue #3420). Mesma dualidade da
   // listagem logo acima: sessão de navegador OU Bearer `dsk_…` com escopo
   // `contacts:read`, resolvido por `lib/api/auth-dual.ts` DENTRO da rota

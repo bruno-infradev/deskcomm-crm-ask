@@ -928,6 +928,16 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    href: "/app/atendimento",
+    label: "Atendimento da Kath",
+    description: "Tempo da primeira resposta, leads sem resposta e taxa de resposta do WhatsApp da Clínica (só admin).",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+    minRole: "admin",
+  },
+  {
     href: "/app/horarios",
     label: "Horários de resposta",
     description: "Quando os leads respondem e qual horário de envio rende mais resposta, por período e dia da semana.",
