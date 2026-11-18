@@ -20,6 +20,7 @@ const DIAS = [
   { id: "sab", rotulo: "Sáb" },
   { id: "dom", rotulo: "Dom" },
 ] as const;
+const ATUALIZAR_A_CADA_MS = 5 * 60 * 1000;
 const OPCOES_DIAS = [7, 14, 30, 60, 90];
 const MINIMO_ENVIADAS_PARA_COR = 5;
 
@@ -137,6 +138,8 @@ export function HorariosClient() {
 
   useEffect(() => {
     void carregar();
+    const id = setInterval(() => void carregar(), ATUALIZAR_A_CADA_MS);
+    return () => clearInterval(id);
   }, [carregar]);
 
   if (erro && !dados) return <p className="text-sm text-destructive">{erro}</p>;
@@ -165,7 +168,7 @@ export function HorariosClient() {
           </label>
         )}
         <span className="text-muted-foreground">
-          {h.totais.recebidas} recebidas · {h.totais.enviadas} enviadas · {h.totais.respondidas} respondidas em 24 h ({pct(h.totais.taxa)})
+          Atualiza sozinho a cada 5 min. {h.totais.recebidas} recebidas · {h.totais.enviadas} enviadas · {h.totais.respondidas} respondidas em 24 h ({pct(h.totais.taxa)})
         </span>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
