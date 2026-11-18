@@ -919,6 +919,15 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    href: "/app/leads-por-origem",
+    label: "Leads por origem",
+    description: "Leads novos da Clínica por dia e por origem de anúncio (fios, abdômen).",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+  },
+  {
     href: "/app/horarios",
     label: "Horários de resposta",
     description: "Quando os leads respondem e qual horário de envio rende mais resposta, por período e dia da semana.",

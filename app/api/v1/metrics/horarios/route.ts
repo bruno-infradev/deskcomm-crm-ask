@@ -24,7 +24,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 
 const querySchema = z.object({
   dias: z.coerce.number().int().min(1).max(90).optional(),
-  vendedor: z.string().uuid().optional(),
+  vendedor: z.string().regex(/^(sessao:)?[0-9a-f-]{36}$/i).optional(),
 });
 
 export async function GET(req: NextRequest): Promise<Response> {
@@ -64,15 +64,17 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const admin = createAdminClient();
   const [{ data: sessoes, error: e1 }, { data: politicas, error: e2 }] = await Promise.all([
-    admin.from("channel_sessions").select("id").eq("organization_id", orgId).is("archived_at", null),
+    admin.from("channel_sessions").select("id, display_name").eq("organization_id", orgId).is("archived_at", null),
     admin.from("channel_routing_policies").select("channel_session_id, default_assignee_user_id").eq("organization_id", orgId),
   ]);
   if (e1 || e2) return fail("internal_error", (e1 ?? e2)!.message, 500, { requestId });
 
   const donoDaSessao = new Map<string, string>();
   for (const p of politicas ?? []) if (p.default_assignee_user_id) donoDaSessao.set(p.channel_session_id as string, p.default_assignee_user_id as string);
+  // Número sem responsável no roteamento (ex.: WhatsApp da Clínica) vira um "vendedor" próprio, só para quem vê todos.
+  const chaveDaSessao = (id: string) => donoDaSessao.get(id) ?? `sessao:${id}`;
   const alvo = veTodos ? parsed.data.vendedor : usuarioId;
-  const idsSessoes = (sessoes ?? []).map((s) => s.id as string).filter((id) => donoDaSessao.has(id) && (!alvo || donoDaSessao.get(id) === alvo));
+  const idsSessoes = (sessoes ?? []).map((s) => s.id as string).filter((id) => (veTodos || donoDaSessao.has(id)) && (!alvo || chaveDaSessao(id) === alvo));
   if (idsSessoes.length === 0) return ok({ dias, horarios: horariosDeResposta([], agora), vendedores: [] }, { requestId });
 
   const mensagens: MensagemDeConversa[] = [];
@@ -92,12 +94,14 @@ export async function GET(req: NextRequest): Promise<Response> {
   }
 
   // Lista completa de vendedores visíveis (para o filtro da tela), mesmo quando o recorte já está num só.
-  const idsVendedores = [...new Set((sessoes ?? []).map((s) => donoDaSessao.get(s.id as string)).filter((id): id is string => !!id && (veTodos || id === usuarioId)))];
+  const nomeDaSessao = new Map((sessoes ?? []).map((s) => [s.id as string, ((s.display_name as string | null) ?? "").trim() || "Número sem nome"]));
+  const chaves = [...new Set((sessoes ?? []).map((s) => chaveDaSessao(s.id as string)).filter((k) => (veTodos ? true : k === usuarioId)))];
   const nomes = await Promise.all(
-    idsVendedores.map(async (id) => {
-      const { data } = await admin.auth.admin.getUserById(id);
+    chaves.map(async (chave) => {
+      if (chave.startsWith("sessao:")) return { user_id: chave, nome: nomeDaSessao.get(chave.slice(7)) ?? "Número sem nome" };
+      const { data } = await admin.auth.admin.getUserById(chave);
       const u = data?.user;
-      return { user_id: id, nome: (u?.user_metadata?.full_name as string | undefined) ?? u?.email ?? "Sem nome" };
+      return { user_id: chave, nome: (u?.user_metadata?.full_name as string | undefined) ?? u?.email ?? "Sem nome" };
     }),
   );
 
