@@ -21,18 +21,41 @@ export const dynamic = "force-dynamic";
 const TABELA = "social_selling_reunioes" as never;
 const COLUNAS = "id, user_id, dia, lead, especialidade, versao_roteiro, gravada, link_gravacao, resultado, obs";
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const corpoBase = {
+const camposDaReuniao = {
   dia: dataIso,
   lead: z.string().trim().min(1).max(200),
   especialidade: z.enum(ESPECIALIDADES),
-  versao_roteiro: z.string().trim().max(20).default(""),
-  gravada: z.boolean().default(false),
-  link_gravacao: z.string().trim().max(500).default(""),
-  resultado: z.enum(RESULTADOS).default("marcada"),
-  obs: z.string().max(1000).default(""),
+  versao_roteiro: z.string().trim().max(20),
+  gravada: z.boolean(),
+  link_gravacao: z.string().trim().max(500),
+  resultado: z.enum(RESULTADOS),
+  obs: z.string().max(1000),
 };
-const postSchema = z.object({ ...corpoBase, user_id: z.string().uuid().optional() }).strict();
-const patchSchema = z.object({ id: z.string().uuid(), ...Object.fromEntries(Object.entries(corpoBase).map(([k, v]) => [k, v.optional()])) } as { id: z.ZodString } & Record<string, z.ZodTypeAny>).strict();
+// POST: cria com valores padrão nos opcionais. PATCH: só os campos enviados mudam (sem default, para não apagar o que já estava).
+const postSchema = z
+  .object({
+    ...camposDaReuniao,
+    versao_roteiro: camposDaReuniao.versao_roteiro.default(""),
+    gravada: camposDaReuniao.gravada.default(false),
+    link_gravacao: camposDaReuniao.link_gravacao.default(""),
+    resultado: camposDaReuniao.resultado.default("marcada"),
+    obs: camposDaReuniao.obs.default(""),
+    user_id: z.string().uuid().optional(),
+  })
+  .strict();
+const patchSchema = z
+  .object({
+    id: z.string().uuid(),
+    dia: camposDaReuniao.dia.optional(),
+    lead: camposDaReuniao.lead.optional(),
+    especialidade: camposDaReuniao.especialidade.optional(),
+    versao_roteiro: camposDaReuniao.versao_roteiro.optional(),
+    gravada: camposDaReuniao.gravada.optional(),
+    link_gravacao: camposDaReuniao.link_gravacao.optional(),
+    resultado: camposDaReuniao.resultado.optional(),
+    obs: camposDaReuniao.obs.optional(),
+  })
+  .strict();
 
 const hojeEmSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const nomeDoUsuario = (u: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): string =>
