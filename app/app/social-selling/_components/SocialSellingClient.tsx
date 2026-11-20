@@ -18,7 +18,7 @@ type Contagens = Record<Chave, number>;
 interface DiaSemana { dia: string; total: Contagens; por_vendedor: Record<string, Contagens>; obs: string[] }
 interface Semana { inicio: string; fim: string; dias: DiaSemana[]; total: Contagens; por_vendedor: Record<string, Contagens>; taxas: { resposta_sobre_enviadas: number | null; agendamento_sobre_respostas: number | null } }
 interface Meu extends Contagens { dia: string; obs: string }
-interface Resposta { dia: string; semana: Semana; nomes: Record<string, string>; eu: { user_id: string; papel: string; pode_ver_todos: boolean }; meus: Meu[] }
+interface Resposta { dia: string; semana: Semana; nomes: Record<string, string>; eu: { user_id: string; papel: string; pode_ver_todos: boolean; pode_lancar_de_todos: boolean }; meus: Meu[] }
 
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -84,7 +84,7 @@ export function SocialSellingClient() {
             <label className="flex flex-col text-sm">Data
               <input type="date" value={dia} max={hojeSP()} onChange={(e) => setDia(e.target.value)} className="rounded-md border bg-background px-2 py-1" />
             </label>
-            {dados.eu.pode_ver_todos && (
+            {dados.eu.pode_lancar_de_todos && (
               <label className="flex flex-col text-sm">Vendedor
                 <select value={alvo} onChange={(e) => setVendedor(e.target.value)} className="rounded-md border bg-background px-2 py-1">
                   {Object.entries(dados.nomes).map(([id, n]) => <option key={id} value={id}>{n}</option>)}

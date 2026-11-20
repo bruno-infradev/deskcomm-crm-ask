@@ -1,7 +1,7 @@
 /**
  * GET/PUT /api/v1/social-selling (fork ASK, T-20261120-001, pedido do Bruno em 20/11/2026).
- * GET ?dia=AAAA-MM-DD: a semana (seg a sex) com total do dia, total da semana e por vendedor. Vendedor (agent) vê só os próprios
- * lançamentos; manager+ vê todos. PUT: grava o dia de um vendedor (upsert). Vendedor só grava o dele, no máximo 14 dias para trás
+ * GET ?dia=AAAA-MM-DD: a semana (seg a sex) com total do dia, total da semana e por vendedor. Todos da organização veem os lançamentos
+ * de todos (Bruno, 20/11: "eles podem ver um do outro, sem problemas"). PUT: grava o dia de um vendedor (upsert). Vendedor só grava o dele, no máximo 14 dias para trás
  * e nunca no futuro; manager+ grava de qualquer vendedor, em qualquer dia passado. A org vem da org ativa (cookie), nunca do body.
  */
 import { randomUUID } from "node:crypto";
@@ -62,17 +62,16 @@ export async function GET(req: NextRequest): Promise<Response> {
   const parsed = querySchema.safeParse({ dia: new URL(req.url).searchParams.get("dia") ?? undefined });
   if (!parsed.success) return fail("validation_failed", "Query inválida.", 422, { details: parsed.error.flatten().fieldErrors as Record<string, unknown>, requestId });
 
-  const veTodos = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
+  const lancaDeTodos = ROLE_RANK[authz.org.role] >= ROLE_RANK.manager;
   const dia = parsed.data.dia ?? hojeEmSP();
   const datas = diasDaSemana(dia);
   const admin = createAdminClient();
-  let consulta = admin
+  const consulta = admin
     .from(TABELA)
     .select("user_id, dia, mensagens_enviadas, respostas, whatsapp, agendamento, no_show, obs")
     .eq("organization_id", authz.org.orgId)
     .gte("dia", datas[0])
     .lte("dia", datas[datas.length - 1]);
-  if (!veTodos) consulta = consulta.eq("user_id", authz.user.id);
   const { data, error } = await consulta;
   if (error) return fail("internal_error", (error as { message: string }).message, 500, { requestId });
 
@@ -85,7 +84,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   await Promise.all(ids.map(async (id) => { const { data: u } = await admin.auth.admin.getUserById(id); nomes[id] = nomeDoUsuario(u?.user); }));
 
   const lancamentoDoUsuario = linhas.filter((l) => l.user_id === authz.user.id);
-  return ok({ dia, semana, nomes, eu: { user_id: authz.user.id, papel: authz.org.role, pode_ver_todos: veTodos }, meus: lancamentoDoUsuario }, { requestId });
+  return ok({ dia, semana, nomes, eu: { user_id: authz.user.id, papel: authz.org.role, pode_ver_todos: true, pode_lancar_de_todos: lancaDeTodos }, meus: lancamentoDoUsuario }, { requestId });
 }
 
 export async function PUT(req: NextRequest): Promise<Response> {
