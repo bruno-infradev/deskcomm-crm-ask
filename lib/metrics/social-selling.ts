@@ -9,9 +9,26 @@ export type CampoNumerico = (typeof CAMPOS_NUMERICOS)[number];
 
 export type Contagens = Record<CampoNumerico, number>;
 
+/** Especialidades do rodízio de social selling (call com a Gabi, 20/11/2026). "" = histórico sem especialidade. */
+export const ESPECIALIDADES = [
+  "Dermatologia",
+  "Medicina estética",
+  "Emagrecimento e nutrologia",
+  "Ginecologia",
+  "Oftalmologia",
+  "Otorrinolaringologia",
+  "Urologia",
+  "Cirurgia plástica",
+  "Medicina do esporte",
+  "Plantão ou convênio",
+  "Outra",
+] as const;
+export const SEM_ESPECIALIDADE = "Sem especialidade (histórico)";
+
 export interface LancamentoDoDia extends Contagens {
   dia: string; // AAAA-MM-DD
   user_id: string | null; // null = total da equipe importado da planilha antiga
+  especialidade: string; // "" = sem especialidade (histórico)
   obs: string;
 }
 
@@ -68,6 +85,7 @@ export interface SemanaSocialSelling {
   dias: DiaDaSemana[];
   total: Contagens;
   por_vendedor: Record<string, Contagens>;
+  por_especialidade: { especialidade: string; total: Contagens; taxas: TaxasSocialSelling }[];
   taxas: TaxasSocialSelling;
 }
 
@@ -94,12 +112,18 @@ export function montarSemana(dia: string, lancamentos: readonly LancamentoDoDia[
     };
   });
   const total = somar(noPeriodo);
+  const porEspecialidade: Record<string, Contagens[]> = {};
+  for (const l of noPeriodo) (porEspecialidade[l.especialidade || SEM_ESPECIALIDADE] ??= []).push(l);
+  const por_especialidade = Object.entries(porEspecialidade)
+    .map(([especialidade, v]) => { const t = somar(v); return { especialidade, total: t, taxas: taxas(t) }; })
+    .sort((a, b) => b.total.agendamento - a.total.agendamento || b.total.respostas - a.total.respostas || b.total.mensagens_enviadas - a.total.mensagens_enviadas);
   return {
     inicio: datas[0] ?? dia,
     fim: datas[DIAS_UTEIS - 1] ?? dia,
     dias,
     total,
     por_vendedor: Object.fromEntries(Object.entries(porVendedorDaSemana).map(([k, v]) => [k, somar(v)])),
+    por_especialidade,
     taxas: taxas(total),
   };
 }

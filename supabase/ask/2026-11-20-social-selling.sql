@@ -37,3 +37,12 @@ insert into public.social_selling_diario (organization_id, user_id, dia, mensage
 on conflict do nothing;
 
 commit;
+
+-- 20/11/2026 17h (Bruno: "separar o relatório também por especialidades"): cada lançamento passa a ter especialidade.
+-- Desfazer: alter table public.social_selling_diario drop constraint social_selling_diario_org_user_dia_esp_key, drop column especialidade; (e recriar unique (organization_id, user_id, dia)).
+begin;
+alter table public.social_selling_diario add column if not exists especialidade text not null default '' check (length(especialidade) <= 60);
+alter table public.social_selling_diario drop constraint if exists social_selling_diario_organization_id_user_id_dia_key;
+alter table public.social_selling_diario drop constraint if exists social_selling_diario_org_user_dia_esp_key;
+alter table public.social_selling_diario add constraint social_selling_diario_org_user_dia_esp_key unique (organization_id, user_id, dia, especialidade);
+commit;

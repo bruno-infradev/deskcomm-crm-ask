@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CHAVE_EQUIPE, diasDaSemana, montarSemana, taxas, type LancamentoDoDia } from "./social-selling";
 
 const lanc = (dia: string, user_id: string | null, n: Partial<LancamentoDoDia> = {}): LancamentoDoDia => ({
-  dia, user_id, mensagens_enviadas: 0, respostas: 0, whatsapp: 0, agendamento: 0, no_show: 0, obs: "", ...n,
+  dia, user_id, especialidade: "", mensagens_enviadas: 0, respostas: 0, whatsapp: 0, agendamento: 0, no_show: 0, obs: "", ...n,
 });
 
 describe("diasDaSemana", () => {
@@ -41,6 +41,22 @@ describe("montarSemana", () => {
   });
   it("junta as observações do dia", () => {
     expect(semana.dias[1]?.obs).toEqual(["3 no-show"]);
+  });
+});
+
+describe("por especialidade", () => {
+  it("soma por especialidade, ordena pela que mais agenda e calcula as taxas de cada uma", () => {
+    const s = montarSemana("2026-11-20", [
+      lanc("2026-11-16", "angelo", { especialidade: "Dermatologia", mensagens_enviadas: 10, respostas: 2 }),
+      lanc("2026-11-17", "joao", { especialidade: "Dermatologia", mensagens_enviadas: 10, respostas: 3, agendamento: 1 }),
+      lanc("2026-11-17", "joao", { especialidade: "Ginecologia", mensagens_enviadas: 10, respostas: 5, agendamento: 2 }),
+      lanc("2026-11-18", null, { mensagens_enviadas: 4 }),
+    ]);
+    expect(s.por_especialidade.map((e) => e.especialidade)).toEqual(["Ginecologia", "Dermatologia", "Sem especialidade (histórico)"]);
+    const derma = s.por_especialidade.find((e) => e.especialidade === "Dermatologia");
+    expect(derma?.total.mensagens_enviadas).toBe(20);
+    expect(derma?.taxas).toEqual({ resposta_sobre_enviadas: 25, agendamento_sobre_respostas: 20 });
+    expect(s.por_especialidade.reduce((n, e) => n + e.total.mensagens_enviadas, 0)).toBe(s.total.mensagens_enviadas);
   });
 });
 
