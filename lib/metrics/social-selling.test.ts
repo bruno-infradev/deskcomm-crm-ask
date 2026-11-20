@@ -31,16 +31,16 @@ describe("montarSemana", () => {
     expect(semana.total.respostas).toBe(12);
   });
   it("separa por vendedor no dia e na semana", () => {
-    expect(semana.dias[0].por_vendedor.angelo.mensagens_enviadas).toBe(30);
-    expect(semana.dias[0].por_vendedor.joao.mensagens_enviadas).toBe(10);
-    expect(semana.por_vendedor.angelo.mensagens_enviadas).toBe(50);
+    expect(semana.dias[0]?.por_vendedor.angelo?.mensagens_enviadas).toBe(30);
+    expect(semana.dias[0]?.por_vendedor.joao?.mensagens_enviadas).toBe(10);
+    expect(semana.por_vendedor.angelo?.mensagens_enviadas).toBe(50);
   });
   it("lançamento sem vendedor (histórico) vira equipe", () => {
     const s = montarSemana("2026-10-19", [lanc("2026-10-19", null, { mensagens_enviadas: 6 })]);
-    expect(s.por_vendedor[CHAVE_EQUIPE].mensagens_enviadas).toBe(6);
+    expect(s.por_vendedor[CHAVE_EQUIPE]?.mensagens_enviadas).toBe(6);
   });
   it("junta as observações do dia", () => {
-    expect(semana.dias[1].obs).toEqual(["3 no-show"]);
+    expect(semana.dias[1]?.obs).toEqual(["3 no-show"]);
   });
 });
 

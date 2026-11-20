@@ -95,8 +95,8 @@ export function montarSemana(dia: string, lancamentos: readonly LancamentoDoDia[
   });
   const total = somar(noPeriodo);
   return {
-    inicio: datas[0],
-    fim: datas[DIAS_UTEIS - 1],
+    inicio: datas[0] ?? dia,
+    fim: datas[DIAS_UTEIS - 1] ?? dia,
     dias,
     total,
     por_vendedor: Object.fromEntries(Object.entries(porVendedorDaSemana).map(([k, v]) => [k, somar(v)])),
