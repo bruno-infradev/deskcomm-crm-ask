@@ -17,8 +17,8 @@ type Contagens = Record<Chave, number>;
 
 interface DiaSemana { dia: string; total: Contagens; por_vendedor: Record<string, Contagens>; obs: string[] }
 interface Taxas { resposta_sobre_enviadas: number | null; agendamento_sobre_respostas: number | null }
-interface Semana { inicio: string; fim: string; dias: DiaSemana[]; total: Contagens; por_vendedor: Record<string, Contagens>; por_especialidade: { especialidade: string; total: Contagens; taxas: Taxas }[]; taxas: Taxas }
-interface Lancamento extends Contagens { dia: string; user_id: string | null; especialidade: string; obs: string }
+interface Semana { inicio: string; fim: string; dias: DiaSemana[]; total: Contagens; por_vendedor: Record<string, Contagens>; por_especialidade: { especialidade: string; total: Contagens; taxas: Taxas }[]; por_versao: { versao: string; total: Contagens; taxas: Taxas }[]; taxas: Taxas }
+interface Lancamento extends Contagens { dia: string; user_id: string | null; especialidade: string; versao_roteiro: string; obs: string }
 interface Resposta { dia: string; semana: Semana; nomes: Record<string, string>; especialidades: string[]; eu: { user_id: string; papel: string; pode_ver_todos: boolean; pode_lancar_de_todos: boolean }; lancamentos: Lancamento[] }
 
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -35,6 +35,7 @@ export function SocialSellingClient() {
   const [obs, setObs] = useState("");
   const [vendedor, setVendedor] = useState<string>("");
   const [especialidade, setEspecialidade] = useState<string>("Dermatologia");
+  const [versao, setVersao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -52,17 +53,17 @@ export function SocialSellingClient() {
   // Preenche o formulário com o que já foi lançado para o vendedor, o dia e a especialidade escolhidos.
   useEffect(() => {
     if (!dados) return;
-    const l = dados.lancamentos.find((x) => x.dia === dia && x.user_id === alvo && x.especialidade === especialidade);
+    const l = dados.lancamentos.find((x) => x.dia === dia && x.user_id === alvo && x.especialidade === especialidade && x.versao_roteiro === versao.trim());
     setForm(l ? Object.fromEntries(CAMPOS.map(({ chave }) => [chave, String(l[chave])])) as Record<Chave, string> : vazio());
     setObs(l?.obs ?? "");
-  }, [dados, dia, alvo, especialidade]);
+  }, [dados, dia, alvo, especialidade, versao]);
 
   const colunasVendedor = useMemo(() => (dados?.eu.pode_ver_todos ? Object.keys(dados.semana.por_vendedor) : []), [dados]);
   const nome = (id: string) => (id === "equipe" ? "Equipe (planilha)" : dados?.nomes[id] ?? "Vendedor");
 
   async function salvar() {
     setSalvando(true); setAviso(null);
-    const corpo = { dia, especialidade, ...(vendedor && vendedor !== dados?.eu.user_id ? { user_id: vendedor } : {}), obs, ...Object.fromEntries(CAMPOS.map(({ chave }) => [chave, Number(form[chave] || 0)])) };
+    const corpo = { dia, especialidade, versao_roteiro: versao.trim(), ...(vendedor && vendedor !== dados?.eu.user_id ? { user_id: vendedor } : {}), obs, ...Object.fromEntries(CAMPOS.map(({ chave }) => [chave, Number(form[chave] || 0)])) };
     const r = await fetch("/api/v1/social-selling", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
     const j = await r.json();
     setSalvando(false);
@@ -96,7 +97,10 @@ export function SocialSellingClient() {
             <select value={especialidade} onChange={(e) => setEspecialidade(e.target.value)} className="max-w-xs rounded-md border bg-background px-2 py-1">
               {dados.especialidades.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
-            <span className="mt-1 text-xs text-muted-foreground">Lance um bloco por especialidade que você abordou no dia.</span>
+            <span className="mt-1 text-xs text-muted-foreground">Lance um bloco por especialidade (e por versão do roteiro) que você abordou no dia.</span>
+          </label>
+          <label className="flex flex-col text-sm">Versão do roteiro (ex.: C1, P2, A1)
+            <input value={versao} maxLength={20} onChange={(e) => setVersao(e.target.value)} className="max-w-[10rem] rounded-md border bg-background px-2 py-1" />
           </label>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {CAMPOS.map(({ chave, rotulo }) => (
@@ -170,6 +174,32 @@ export function SocialSellingClient() {
               </tbody>
             </table>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Por versão do roteiro na semana</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-2 pr-4">Versão</th>
+                {CAMPOS.map(({ chave, rotulo }) => <th key={chave} className="px-2 py-2 text-right">{rotulo}</th>)}
+                <th className="px-2 py-2 text-right">% resposta</th>
+                <th className="px-2 py-2 text-right">% agendamento</th>
+              </tr>
+            </thead>
+            <tbody>
+              {semana.por_versao.map((v) => (
+                <tr key={v.versao} className="border-b">
+                  <td className="py-2 pr-4">{v.versao}</td>
+                  {CAMPOS.map(({ chave }) => <td key={chave} className="px-2 py-2 text-right tabular-nums">{v.total[chave]}</td>)}
+                  <td className="px-2 py-2 text-right tabular-nums">{pct(v.taxas.resposta_sobre_enviadas)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{pct(v.taxas.agendamento_sobre_respostas)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
     </div>

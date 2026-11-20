@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/auth/server";
 
+import { ReunioesClient } from "./_components/ReunioesClient";
 import { SocialSellingClient } from "./_components/SocialSellingClient";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function SocialSellingPage() {
         </p>
       </header>
       <SocialSellingClient />
+      <ReunioesClient />
     </div>
   );
 }

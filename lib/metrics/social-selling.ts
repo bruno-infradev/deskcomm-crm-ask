@@ -29,6 +29,7 @@ export interface LancamentoDoDia extends Contagens {
   dia: string; // AAAA-MM-DD
   user_id: string | null; // null = total da equipe importado da planilha antiga
   especialidade: string; // "" = sem especialidade (histórico)
+  versao_roteiro: string; // código curto da versão da mensagem (ex.: C1); "" = sem versão
   obs: string;
 }
 
@@ -86,8 +87,11 @@ export interface SemanaSocialSelling {
   total: Contagens;
   por_vendedor: Record<string, Contagens>;
   por_especialidade: { especialidade: string; total: Contagens; taxas: TaxasSocialSelling }[];
+  por_versao: { versao: string; total: Contagens; taxas: TaxasSocialSelling }[];
   taxas: TaxasSocialSelling;
 }
+
+export const SEM_VERSAO_LANCAMENTO = "Sem versão";
 
 export const CHAVE_EQUIPE = "equipe";
 
@@ -114,9 +118,16 @@ export function montarSemana(dia: string, lancamentos: readonly LancamentoDoDia[
   const total = somar(noPeriodo);
   const porEspecialidade: Record<string, Contagens[]> = {};
   for (const l of noPeriodo) (porEspecialidade[l.especialidade || SEM_ESPECIALIDADE] ??= []).push(l);
+  const ordem = (a: { total: Contagens }, b: { total: Contagens }) =>
+    b.total.agendamento - a.total.agendamento || b.total.respostas - a.total.respostas || b.total.mensagens_enviadas - a.total.mensagens_enviadas;
   const por_especialidade = Object.entries(porEspecialidade)
     .map(([especialidade, v]) => { const t = somar(v); return { especialidade, total: t, taxas: taxas(t) }; })
-    .sort((a, b) => b.total.agendamento - a.total.agendamento || b.total.respostas - a.total.respostas || b.total.mensagens_enviadas - a.total.mensagens_enviadas);
+    .sort(ordem);
+  const porVersao: Record<string, Contagens[]> = {};
+  for (const l of noPeriodo) (porVersao[l.versao_roteiro.trim() || SEM_VERSAO_LANCAMENTO] ??= []).push(l);
+  const por_versao = Object.entries(porVersao)
+    .map(([versao, v]) => { const t = somar(v); return { versao, total: t, taxas: taxas(t) }; })
+    .sort(ordem);
   return {
     inicio: datas[0] ?? dia,
     fim: datas[DIAS_UTEIS - 1] ?? dia,
@@ -124,6 +135,7 @@ export function montarSemana(dia: string, lancamentos: readonly LancamentoDoDia[
     total,
     por_vendedor: Object.fromEntries(Object.entries(porVendedorDaSemana).map(([k, v]) => [k, somar(v)])),
     por_especialidade,
+    por_versao,
     taxas: taxas(total),
   };
 }

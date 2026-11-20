@@ -30,6 +30,7 @@ const putSchema = z
     dia: dataIso,
     user_id: z.string().uuid().optional(),
     especialidade: z.enum(ESPECIALIDADES),
+    versao_roteiro: z.string().trim().max(20).default(""),
     mensagens_enviadas: contagem,
     respostas: contagem,
     whatsapp: contagem,
@@ -45,6 +46,7 @@ interface Linha {
   user_id: string | null;
   dia: string;
   especialidade: string;
+  versao_roteiro: string;
   mensagens_enviadas: number;
   respostas: number;
   whatsapp: number;
@@ -70,7 +72,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const admin = createAdminClient();
   const consulta = admin
     .from(TABELA)
-    .select("user_id, dia, especialidade, mensagens_enviadas, respostas, whatsapp, agendamento, no_show, obs")
+    .select("user_id, dia, especialidade, versao_roteiro, mensagens_enviadas, respostas, whatsapp, agendamento, no_show, obs")
     .eq("organization_id", authz.org.orgId)
     .gte("dia", datas[0])
     .lte("dia", datas[datas.length - 1]);
@@ -114,8 +116,8 @@ export async function PUT(req: NextRequest): Promise<Response> {
   }
   const { data, error } = await admin
     .from(TABELA)
-    .upsert({ organization_id: authz.org.orgId, user_id: userId, ...valores, updated_at: new Date().toISOString() } as never, { onConflict: "organization_id,user_id,dia,especialidade" })
-    .select("user_id, dia, especialidade, mensagens_enviadas, respostas, whatsapp, agendamento, no_show, obs")
+    .upsert({ organization_id: authz.org.orgId, user_id: userId, ...valores, updated_at: new Date().toISOString() } as never, { onConflict: "organization_id,user_id,dia,especialidade,versao_roteiro" })
+    .select("user_id, dia, especialidade, versao_roteiro, mensagens_enviadas, respostas, whatsapp, agendamento, no_show, obs")
     .single();
   if (error) return fail("internal_error", (error as { message: string }).message, 500, { requestId });
   return ok({ lancamento: data }, { requestId });

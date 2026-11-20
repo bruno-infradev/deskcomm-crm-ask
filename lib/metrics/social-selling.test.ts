@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CHAVE_EQUIPE, diasDaSemana, montarSemana, taxas, type LancamentoDoDia } from "./social-selling";
 
 const lanc = (dia: string, user_id: string | null, n: Partial<LancamentoDoDia> = {}): LancamentoDoDia => ({
-  dia, user_id, especialidade: "", mensagens_enviadas: 0, respostas: 0, whatsapp: 0, agendamento: 0, no_show: 0, obs: "", ...n,
+  dia, user_id, especialidade: "", versao_roteiro: "", mensagens_enviadas: 0, respostas: 0, whatsapp: 0, agendamento: 0, no_show: 0, obs: "", ...n,
 });
 
 describe("diasDaSemana", () => {
@@ -57,6 +57,20 @@ describe("por especialidade", () => {
     expect(derma?.total.mensagens_enviadas).toBe(20);
     expect(derma?.taxas).toEqual({ resposta_sobre_enviadas: 25, agendamento_sobre_respostas: 20 });
     expect(s.por_especialidade.reduce((n, e) => n + e.total.mensagens_enviadas, 0)).toBe(s.total.mensagens_enviadas);
+  });
+});
+
+describe("por versão do roteiro", () => {
+  it("soma por versão, ordena pela que mais agenda e junta as sem versão", () => {
+    const s = montarSemana("2026-11-20", [
+      lanc("2026-11-16", "a", { versao_roteiro: "C1", mensagens_enviadas: 10, respostas: 4, agendamento: 1 }),
+      lanc("2026-11-17", "b", { versao_roteiro: "C1", mensagens_enviadas: 10, respostas: 1 }),
+      lanc("2026-11-17", "a", { versao_roteiro: "P2", mensagens_enviadas: 10, respostas: 0 }),
+      lanc("2026-11-18", null, { mensagens_enviadas: 3 }),
+    ]);
+    expect(s.por_versao.map((v) => v.versao)).toEqual(["C1", "P2", "Sem versão"]);
+    expect(s.por_versao[0]?.total.mensagens_enviadas).toBe(20);
+    expect(s.por_versao[0]?.taxas.resposta_sobre_enviadas).toBe(25);
   });
 });
 
