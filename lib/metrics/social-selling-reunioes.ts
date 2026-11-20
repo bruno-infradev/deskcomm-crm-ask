@@ -20,6 +20,8 @@ export interface Reuniao {
   user_id: string | null;
   dia: string; // AAAA-MM-DD
   lead: string;
+  contato: string; // telefone ou @ do lead
+  link_zoom: string; // link do agendamento no Zoom
   especialidade: string;
   versao_roteiro: string;
   gravada: boolean;

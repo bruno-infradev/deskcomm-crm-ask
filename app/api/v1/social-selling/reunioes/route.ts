@@ -19,11 +19,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const TABELA = "social_selling_reunioes" as never;
-const COLUNAS = "id, user_id, dia, lead, especialidade, versao_roteiro, gravada, link_gravacao, resultado, obs";
+const COLUNAS = "id, user_id, dia, lead, contato, link_zoom, especialidade, versao_roteiro, gravada, link_gravacao, resultado, obs";
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const camposDaReuniao = {
   dia: dataIso,
   lead: z.string().trim().min(1).max(200),
+  contato: z.string().trim().max(120),
+  link_zoom: z.string().trim().max(500),
   especialidade: z.enum(ESPECIALIDADES),
   versao_roteiro: z.string().trim().max(20),
   gravada: z.boolean(),
@@ -35,6 +37,8 @@ const camposDaReuniao = {
 const postSchema = z
   .object({
     ...camposDaReuniao,
+    contato: camposDaReuniao.contato.default(""),
+    link_zoom: camposDaReuniao.link_zoom.default(""),
     versao_roteiro: camposDaReuniao.versao_roteiro.default(""),
     gravada: camposDaReuniao.gravada.default(false),
     link_gravacao: camposDaReuniao.link_gravacao.default(""),
@@ -48,6 +52,8 @@ const patchSchema = z
     id: z.string().uuid(),
     dia: camposDaReuniao.dia.optional(),
     lead: camposDaReuniao.lead.optional(),
+    contato: camposDaReuniao.contato.optional(),
+    link_zoom: camposDaReuniao.link_zoom.optional(),
     especialidade: camposDaReuniao.especialidade.optional(),
     versao_roteiro: camposDaReuniao.versao_roteiro.optional(),
     gravada: camposDaReuniao.gravada.optional(),

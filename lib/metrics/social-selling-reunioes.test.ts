@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { porEspecialidade, porVersao, resumir, type Reuniao } from "./social-selling-reunioes";
 
-const r = (n: Partial<Reuniao>): Reuniao => ({ id: "x", user_id: "a", dia: "2026-11-20", lead: "Dra. X", especialidade: "Dermatologia", versao_roteiro: "C1", gravada: false, link_gravacao: "", resultado: "marcada", obs: "", ...n });
+const r = (n: Partial<Reuniao>): Reuniao => ({ id: "x", user_id: "a", dia: "2026-11-20", lead: "Dra. X", contato: "", link_zoom: "", especialidade: "Dermatologia", versao_roteiro: "C1", gravada: false, link_gravacao: "", resultado: "marcada", obs: "", ...n });
 
 describe("resumir", () => {
   it("conta marcadas, feitas, no-show, propostas, vendas, gravadas e comparecimento", () => {

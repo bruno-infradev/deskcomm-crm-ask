@@ -76,3 +76,8 @@ drop policy if exists tenant_isolation_social_selling_reunioes_all on public.soc
 create policy tenant_isolation_social_selling_reunioes_all on public.social_selling_reunioes
   for select to authenticated using (organization_id in (select public.fn_user_org_ids()));
 commit;
+
+-- 20/11/2026 19h (Ângelo na call): reunião agendada leva telefone ou @ do lead e link do agendamento no Zoom.
+-- Desfazer: alter table public.social_selling_reunioes drop column contato, drop column link_zoom;
+alter table public.social_selling_reunioes add column if not exists contato text not null default '' check (length(contato) <= 120);
+alter table public.social_selling_reunioes add column if not exists link_zoom text not null default '' check (length(link_zoom) <= 500);

@@ -15,7 +15,7 @@ type Resultado = (typeof RESULTADOS)[number]["valor"];
 
 interface Resumo { marcadas: number; feitas: number; no_show: number; propostas: number; vendas: number; gravadas: number; comparecimento: number | null }
 interface Grupo { chave: string; resumo: Resumo }
-interface Reuniao { id: string; user_id: string | null; dia: string; lead: string; especialidade: string; versao_roteiro: string; gravada: boolean; link_gravacao: string; resultado: Resultado; obs: string }
+interface Reuniao { id: string; user_id: string | null; dia: string; lead: string; contato: string; link_zoom: string; especialidade: string; versao_roteiro: string; gravada: boolean; link_gravacao: string; resultado: Resultado; obs: string }
 interface Resposta { inicio: string; fim: string; reunioes: Reuniao[]; nomes: Record<string, string>; resumo: Resumo; por_especialidade: Grupo[]; por_versao: Grupo[]; por_vendedor: Grupo[]; eu: { user_id: string; pode_editar_de_todos: boolean } }
 
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -60,7 +60,7 @@ export function ReunioesClient() {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [form, setForm] = useState({ dia: hojeSP(), lead: "", especialidade: "Dermatologia", versao_roteiro: "", gravada: false, link_gravacao: "", resultado: "marcada" as Resultado, obs: "" });
+  const [form, setForm] = useState({ dia: hojeSP(), lead: "", contato: "", link_zoom: "", especialidade: "Dermatologia", versao_roteiro: "", gravada: false, link_gravacao: "", resultado: "marcada" as Resultado, obs: "" });
 
   const carregar = useCallback(async () => {
     const r = await fetch(`/api/v1/social-selling/reunioes?dia=${hojeSP()}`, { cache: "no-store" });
@@ -75,7 +75,7 @@ export function ReunioesClient() {
     const r = await fetch("/api/v1/social-selling/reunioes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const j = await r.json();
     if (!r.ok) { setAviso(j?.error?.message ?? "Não consegui salvar."); return; }
-    setAviso("Reunião lançada."); setForm({ ...form, lead: "", link_gravacao: "", obs: "", gravada: false, resultado: "marcada" });
+    setAviso("Reunião lançada."); setForm({ ...form, lead: "", contato: "", link_zoom: "", link_gravacao: "", obs: "", gravada: false, resultado: "marcada" });
     await carregar();
   }
   async function mudar(id: string, mudancas: Partial<Reuniao>) {
@@ -103,6 +103,8 @@ export function ReunioesClient() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <label className="flex flex-col text-sm">Data<input type="date" value={form.dia} max={hojeSP()} onChange={(e) => setForm({ ...form, dia: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
             <label className="flex flex-col text-sm md:col-span-2">Lead (nome ou @ do perfil)<input value={form.lead} maxLength={200} onChange={(e) => setForm({ ...form, lead: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
+            <label className="flex flex-col text-sm">Telefone ou @ do lead<input value={form.contato} maxLength={120} onChange={(e) => setForm({ ...form, contato: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
+            <label className="flex flex-col text-sm md:col-span-2">Link do agendamento (Zoom)<input value={form.link_zoom} maxLength={500} onChange={(e) => setForm({ ...form, link_zoom: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
             <label className="flex flex-col text-sm">Especialidade<select value={form.especialidade} onChange={(e) => setForm({ ...form, especialidade: e.target.value })} className="rounded-md border bg-background px-2 py-1">{ESPECIALIDADES.map((e) => <option key={e}>{e}</option>)}</select></label>
             <label className="flex flex-col text-sm">Versão do roteiro<input value={form.versao_roteiro} maxLength={20} onChange={(e) => setForm({ ...form, versao_roteiro: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
             <label className="flex flex-col text-sm">Resultado<select value={form.resultado} onChange={(e) => setForm({ ...form, resultado: e.target.value as Resultado })} className="rounded-md border bg-background px-2 py-1">{RESULTADOS.map((r) => <option key={r.valor} value={r.valor}>{r.rotulo}</option>)}</select></label>
@@ -122,13 +124,15 @@ export function ReunioesClient() {
         <CardContent className="overflow-x-auto">
           {dados.reunioes.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma reunião lançada nesta semana.</p> : (
             <table className="w-full text-sm">
-              <thead><tr className="border-b text-left"><th className="py-2 pr-3">Dia</th><th className="px-2 py-2">Vendedor</th><th className="px-2 py-2">Lead</th><th className="px-2 py-2">Especialidade</th><th className="px-2 py-2">Versão</th><th className="px-2 py-2">Gravada</th><th className="px-2 py-2">Resultado</th></tr></thead>
+              <thead><tr className="border-b text-left"><th className="py-2 pr-3">Dia</th><th className="px-2 py-2">Vendedor</th><th className="px-2 py-2">Lead</th><th className="px-2 py-2">Contato</th><th className="px-2 py-2">Zoom</th><th className="px-2 py-2">Especialidade</th><th className="px-2 py-2">Versão</th><th className="px-2 py-2">Gravada</th><th className="px-2 py-2">Resultado</th></tr></thead>
               <tbody>
                 {dados.reunioes.map((r) => (
                   <tr key={r.id} className="border-b">
                     <td className="py-2 pr-3">{r.dia.slice(8)}/{r.dia.slice(5, 7)}</td>
                     <td className="px-2 py-2">{r.user_id ? dados.nomes[r.user_id] ?? "Vendedor" : "Equipe"}</td>
-                    <td className="px-2 py-2">{r.lead}</td>
+                    <td className="px-2 py-2">{r.lead}{r.obs ? <div className="text-xs text-muted-foreground">{r.obs}</div> : null}</td>
+                    <td className="px-2 py-2">{r.contato || "-"}</td>
+                    <td className="px-2 py-2">{r.link_zoom ? <a className="underline" href={r.link_zoom} target="_blank" rel="noreferrer">Abrir</a> : "-"}</td>
                     <td className="px-2 py-2">{r.especialidade || "-"}</td>
                     <td className="px-2 py-2">{r.versao_roteiro || "-"}</td>
                     <td className="px-2 py-2">{r.gravada ? (r.link_gravacao ? <a className="underline" href={r.link_gravacao} target="_blank" rel="noreferrer">Sim, ver</a> : "Sim") : "Não"}</td>
