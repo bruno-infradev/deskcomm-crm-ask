@@ -919,6 +919,15 @@ export const NAV_CATALOG = [
     sidebar: true,
   },
   {
+    href: "/app/social-selling",
+    label: "Social selling",
+    description: "Lançamento diário de mensagens, respostas, WhatsApp, agendamento e no-show, com a semana somada.",
+    icon: "ChartBar",
+    group: "analise",
+    section: "Os números do período",
+    sidebar: true,
+  },
+  {
     href: "/app/leads-por-origem",
     label: "Leads por origem",
     description: "Leads novos da Clínica por dia e por origem de anúncio (fios, abdômen).",
