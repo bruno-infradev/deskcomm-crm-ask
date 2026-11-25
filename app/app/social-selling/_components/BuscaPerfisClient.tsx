@@ -90,7 +90,7 @@ export function BuscaPerfisClient() {
             <label className="flex flex-col text-sm md:col-span-2">Hashtag ou palavra-chave (opcional)<input value={form.palavra} maxLength={60} placeholder="botox, blefaroplastia, rejuvenescimento íntimo" onChange={(e) => setForm({ ...form, palavra: e.target.value })} className="rounded-md border bg-background px-2 py-1" /></label>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" disabled={buscando || bloqueado} onClick={() => void buscar()} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{buscando ? "Buscando..." : "Buscar"}</button>
+            <button type="button" disabled={buscando || bloqueado} onClick={() => void buscar()} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">{buscando ? "Buscando... (até 1 min)" : "Buscar"}</button>
             {resultado && !buscando && !bloqueado && <button type="button" onClick={() => void buscar(true)} className="rounded-md border px-3 py-2 text-sm">Buscar de novo (ignora o guardado)</button>}
             {bloqueado && <span className="text-sm text-destructive">Você usou os {uso?.limite} perfis de hoje. A cota volta à meia-noite (São Paulo).</span>}
             {aviso && <span className="text-sm text-muted-foreground">{aviso}</span>}
