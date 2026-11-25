@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAuth } from "@/lib/auth/server";
 
+import { BuscaPerfisClient } from "./_components/BuscaPerfisClient";
 import { ReunioesClient } from "./_components/ReunioesClient";
 import { SocialSellingClient } from "./_components/SocialSellingClient";
 
@@ -18,6 +19,7 @@ export default async function SocialSellingPage() {
         </p>
       </header>
       <SocialSellingClient />
+      <BuscaPerfisClient />
       <ReunioesClient />
     </div>
   );
