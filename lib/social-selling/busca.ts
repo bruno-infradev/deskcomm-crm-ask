@@ -82,6 +82,9 @@ const REGISTRO = /(CRM[\s/-]*[A-Z]{0,2}[\s:-]*\d[\d.]*(?:\s*(?:\/|-|e)?\s*RQE[\s
 const CIDADE_UF = /(?:em|·|\||-|—|📍)\s*([A-ZÀ-Ú][\p{L}'. ]{2,30})\s*[-–/|,]\s*([A-Z]{2})\b/u;
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
+/** Nome do perfil que já entrega que não é do público (dentista, biomédico, modelo): evita gastar com o enriquecimento. */
+export const nomeForaDoPublico = (nome: string): boolean => !/\bm[eé]dic[oa]\b|\bdra?\b/i.test(nome) && EXCLUIDOS.some(([, regra]) => regra.test(nome));
+
 export const normalizar = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
 export const limparUsername = (u: string): string => u.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[/?#].*$/, "").toLowerCase();
 

@@ -16,7 +16,7 @@ import { ApifyIndisponivel, buscarPerfisNoApify } from "@/lib/social-selling/api
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 90;
+export const maxDuration = 150;
 
 const buscaSchema = z
   .object({
@@ -64,6 +64,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (antes.restante === 0) return fail("rate_limited", `Você já usou ${antes.usados} de ${antes.limite} perfis hoje. A cota volta à meia-noite (horário de São Paulo).`, 429, { requestId });
 
   const admin = createAdminClient();
+  const { data: conhecidos } = await admin.from("social_selling_prospectos" as never).select("username").eq("organization_id", orgId);
+  const jaConhecidos = new Set(((conhecidos ?? []) as Array<{ username: string }>).map((c) => c.username));
   const chave = chaveDeCache(termo);
   const { data: emCache } = await admin.from("social_selling_busca_cache" as never).select("resultados, created_at").eq("organization_id", orgId).eq("chave", chave).maybeSingle();
   const cache = emCache as { resultados: PerfilBruto[]; created_at: string } | null;
@@ -74,7 +76,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     doCache = true;
   } else {
     try {
-      brutos = await buscarPerfisNoApify(termo, process.env.APIFY_TOKEN);
+      brutos = await buscarPerfisNoApify(termo, process.env.APIFY_TOKEN, jaConhecidos);
     } catch (e) {
       const mensagem = e instanceof ApifyIndisponivel ? e.message : "Não consegui falar com o motor de busca. Tente de novo em instantes.";
       return fail("upstream_unavailable", mensagem, 502, { requestId });
@@ -82,8 +84,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     await admin.from("social_selling_busca_cache" as never).upsert({ organization_id: orgId, chave, resultados: brutos, created_at: new Date().toISOString() } as never, { onConflict: "organization_id,chave" });
   }
 
-  const { data: conhecidos } = await admin.from("social_selling_prospectos" as never).select("username").eq("organization_id", orgId);
-  const jaConhecidos = new Set(((conhecidos ?? []) as Array<{ username: string }>).map((c) => c.username));
   const { perfis, excluidos } = filtrarEPontuar(brutos, jaConhecidos, { especialidade: parsed.data.especialidade, cidade: parsed.data.cidade });
   const candidatos = perfis.slice(0, antes.restante);
   const { data: concedido, error } = await admin.rpc("social_selling_consumir_cota" as never, { p_org: orgId, p_user: authz.user.id, p_dia: hojeEmSP(), p_pedido: candidatos.length, p_limite: antes.limite } as never);
